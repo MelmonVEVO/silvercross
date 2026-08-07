@@ -1,14 +1,14 @@
+#include "assets.h"
 #include "constants.h"
 #include "entity.h"
 #include "game.h"
 #include "primitives.h"
+#include "utils.h"
 #include <dlfcn.h>
 #include <math.h>
 #include <raylib.h>
 
 bool is_gameplay = true;
-
-void load_assets(void) {}
 
 void PROCESS(void) { process_game(); }
 
@@ -36,8 +36,8 @@ void DRAW(RenderTexture2D target) {
     f32 vpdraw_x;
     f32 vpdraw_y;
 
-    vpdraw_y = (GetScreenHeight() - vpheight_scaled) * 0.5f;
-    vpdraw_x = (GetScreenWidth() - vpwidth_scaled) * 0.5f;
+    vpdraw_y = floorf((GetScreenHeight() - vpheight_scaled) * 0.5f);
+    vpdraw_x = floorf((GetScreenWidth() - vpwidth_scaled) * 0.5f);
 
     // Shadow
     DrawRectanglePro((Rectangle){vpdraw_x + 10, vpdraw_y + 10,
@@ -55,6 +55,11 @@ void DRAW(RenderTexture2D target) {
         (Rectangle){0, 0, target.texture.width, -target.texture.height},
         (Rectangle){vpdraw_x, vpdraw_y, vpwidth_scaled, vpheight_scaled},
         (Vector2){0, 0}, 0, WHITE);
+
+    draw_outlined_text_ex(TextFormat("%d", GetFPS()), assets.fonts.fusion,
+                          (Vector2){16.0f, 16.0f},
+                          (float)assets.fonts.fusion.baseSize * 8, 0,
+                          WHITE, BLACK, 2);
 
     EndDrawing();
 }

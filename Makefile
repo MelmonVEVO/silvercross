@@ -18,7 +18,7 @@ OBJ := $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRC))
 DEP := $(OBJ:.o=.d)
 
 CC ?= gcc
-CFLAGS := -I$(INC_DIR) -Wall -Wextra -MMD -MP
+CFLAGS := -std=c23 -I$(INC_DIR) -Wall -Wextra -MMD -MP
 
 LIB_DIR := ./lib
 

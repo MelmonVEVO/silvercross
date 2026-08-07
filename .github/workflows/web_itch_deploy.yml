@@ -15,7 +15,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev emscripten
+          sudo apt install libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev
+
+      - name: Setup emscripten
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: "6.0.4"
 
       - name: Make the thing
         run: |

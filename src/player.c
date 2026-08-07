@@ -1,6 +1,5 @@
 #include "constants.h"
 #include "entity.h"
-#include "utils.h"
 #include <raylib.h>
 #include <raymath.h>
 
@@ -50,7 +49,8 @@ void process_player(Entity *player, f32 delta) {
 }
 
 void draw_player(Entity *player, f32 delta) {
-    DrawCircle(player->position.x, player->position.y, 8.0f, GREEN);
+    DrawRectangle(player->position.x - 1, player->position.y - 1, 2, 2,
+                  RED);
 }
 
 void init_player(Entity *player) {
@@ -58,4 +58,5 @@ void init_player(Entity *player) {
         floorf(VIEWPORT_WIDTH / 2.0f),
         VIEWPORT_HEIGHT - 45.0f,
     };
+    player->collision = (Vector2){2.0f, 2.0f};
 }
