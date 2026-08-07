@@ -1,0 +1,37 @@
+name: Build and publish web build to itch.io
+
+on: workflow_dispatch
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: "true"
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install libasound2-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev libxkbcommon-dev emscripten
+
+      - name: Make the thing
+        run: |
+          make -j8 PLATFORM=web
+          if [ ! -f ./out/index.html ]; then
+            echo "::error file=Makefile, line=1::Build failed: index.html not found"
+            exit 1
+          fi
+          zip -r magicalshoot out/index.*
+
+      - name: Setup Butler
+        uses: remarkablegames/setup-butler@v3
+
+      - name: Upload to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          butler push magicalshoot.zip Melmon/magical-shoot:html5 \
+          --userversion "${GITHUB_REF_NAME}-${GITHUB_SHA::7}"
