@@ -50,7 +50,7 @@ typedef struct {
     int count;
 } PartitionCell;
 
-#define SPATIAL_PARTITION_CELL_SIZE 20
+#define SPATIAL_PARTITION_CELL_SIZE 16
 #define PARTITION_GRID_WIDTH (VIEWPORT_WIDTH / SPATIAL_PARTITION_CELL_SIZE)
 #define PARTITION_GRID_HEIGHT                                             \
     (VIEWPORT_HEIGHT / SPATIAL_PARTITION_CELL_SIZE)
@@ -66,9 +66,7 @@ static SpatialPartition partition_grid = {};
 
 typedef struct {
     i32 xstart;
-    i32 xend;
     i32 ystart;
-    i32 yend;
 } EntityPartitionBounds;
 
 static EntityPartitionBounds partition_bounds[MAX_ENTITIES] = {};
@@ -87,7 +85,8 @@ typedef struct {
     u32 count;
 } CollisionList;
 
-CollisionList collision_list = {};
+static CollisionList collision_list = {};
+static Rectangle collision_rects[MAX_ENTITIES] = {};
 
 static inline bool is_valid_collision(EntityType a, EntityType b) {
     EntityType a_nrm = (EntityType)MIN(a, b);
@@ -113,8 +112,6 @@ static inline void add_collision(u32 a, u32 b) {
 
     Entity *a_entity = &entities.entities[a];
     Entity *b_entity = &entities.entities[b];
-    if (!a_entity || !b_entity)
-        return;
     u32 lower = MIN(a, b);
     u32 higher = MAX(a, b);
 
@@ -134,31 +131,27 @@ void record_collisions(void) {
             for (i32 i = 0; i < current->count; i++) {
                 u32 a_entity = current->entity_idxs[i];
                 Entity *a_entity_p = &entities.entities[a_entity];
-                Rectangle a_collision_box = create_centred_rectangle(
-                    a_entity_p->position.x, a_entity_p->position.y,
-                    a_entity_p->collision);
+                Rectangle a_collision_box = collision_rects[a_entity];
+                EntityPartitionBounds a_bounds =
+                    partition_bounds[a_entity];
                 for (i32 j = i + 1; j < current->count; j++) {
                     u32 b_entity = current->entity_idxs[j];
                     Entity *b_entity_p = &entities.entities[b_entity];
-
-                    EntityPartitionBounds *a_bounds =
-                        &partition_bounds[a_entity];
-                    EntityPartitionBounds *b_bounds =
-                        &partition_bounds[b_entity];
-
-                    i32 shared_x = MAX(a_bounds->xstart, b_bounds->xstart);
-                    i32 shared_y = MAX(a_bounds->ystart, b_bounds->ystart);
-
-                    if (x != shared_x || y != shared_y)
-                        continue;
 
                     if (!is_valid_collision(a_entity_p->type,
                                             b_entity_p->type))
                         continue;
 
-                    Rectangle b_collision_box = create_centred_rectangle(
-                        b_entity_p->position.x, b_entity_p->position.y,
-                        b_entity_p->collision);
+                    EntityPartitionBounds b_bounds =
+                        partition_bounds[b_entity];
+
+                    i32 shared_x = MAX(a_bounds.xstart, b_bounds.xstart);
+                    i32 shared_y = MAX(a_bounds.ystart, b_bounds.ystart);
+
+                    if (x != shared_x || y != shared_y)
+                        continue;
+
+                    Rectangle b_collision_box = collision_rects[b_entity];
                     bool colliding = CheckCollisionRecs(a_collision_box,
                                                         b_collision_box);
                     if (!colliding)
@@ -201,8 +194,8 @@ void update_partition_grid(void) {
 
         i32 xstart, xend, ystart, yend;
         Rectangle entity_bounds = create_centred_rectangle(
-            current->position.x, current->position.y,
-            (Vector2){current->collision.x, current->collision.y});
+            current->position.x, current->position.y, current->collision);
+        collision_rects[i] = entity_bounds;
         if (test_rectangle_offscreen(entity_bounds))
             continue;
 
@@ -222,9 +215,7 @@ void update_partition_grid(void) {
 
         partition_bounds[i] = (EntityPartitionBounds){
             .xstart = xstart,
-            .xend = xend,
             .ystart = ystart,
-            .yend = yend,
         };
 
         for (i32 y = ystart; y <= yend; y++) {

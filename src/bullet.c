@@ -12,7 +12,9 @@ void process_bullet(Entity *self, f32 delta) {
     self->as.bullet.ttl -= delta;
     if ((self->as.bullet.ttl <= 0) ||
         (self->position.y < -10.0f &&
-         self->as.bullet.config.flags & BULLETFLAG_PLAYER))
+         self->as.bullet.config.flags & BULLETFLAG_PLAYER) ||
+        (test_rectangle_offscreen((Rectangle){
+            self->position.x - 1, self->position.y - 1, 2, 2})))
         destroy_entity_ptr(self);
 }
 

@@ -23,7 +23,7 @@
 #define TERM_ERROR "\x1b[31m"
 #define TERM_NORMAL "\x1b[0m"
 
-#define MAX_ENTITIES 25000
+#define MAX_ENTITIES 120000
 
 #define FRAMERATE 60
 

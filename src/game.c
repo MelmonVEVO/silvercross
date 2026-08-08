@@ -19,7 +19,7 @@ BulletConfig test_bullet_config = (BulletConfig){
     .bullet_texture = &assets.textures.bullets1,
     .texture_row = 2,
     .initial_speed = 40.0f,
-    .initial_ttl = 5.0f,
+    .initial_ttl = 10.0f,
 };
 
 f32 cd = 0;
@@ -40,8 +40,8 @@ void process_game(void) {
         assert(!paused);
         if (cd <= 0) {
             bullet_fire_ring((Vector2){VIEWPORT_WIDTH / 2.0f, 40}, r,
-                             &test_bullet_config, 180, 0, TRJ_DEFAULT);
-            cd += 0.05f;
+                             &test_bullet_config, 450, 0, TRJ_DEFAULT);
+            cd += 0.03f;
         }
         r = fmodf(r + (15.0f * fixed_delta), 360.0f);
         cd -= fixed_delta;
