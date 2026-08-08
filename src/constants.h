@@ -6,12 +6,6 @@
 #define VECTOR2LEFT (Vector2){-1.0f, 0}
 #define VECTOR2RIGHT (Vector2){1.0f, 0}
 #define TAU (PI * 2)
-#define MAX(a, b) ((a) > (b) ? a : b)
-#define MIN(a, b) ((a) < (b) ? a : b)
-#define ARRAYLEN(arr) (sizeof((arr)) / sizeof((arr)[0]))
-// Uses radians.
-#define VEC2FROMANGLE(angle, magnitude)                                   \
-    Vector2Scale((Vector2){cosf(angle), sinf(angle)}, magnitude)
 
 #define VIEWPORT_WIDTH 240
 #define VIEWPORT_HEIGHT 320
@@ -21,6 +15,8 @@
 #define PLAYER_FIRE_TIME 0.3f
 #define PLAYER_FIRE_RATE 0.06f
 #define PLAYER_MOVEMENT_BOUNDS_UNITS 7.0f
+#define PLAYER_COUNTERBOMB_WINDOW_FRAMES 8
+#define PLAYER_INVINCIBILITY_TIME 2.0f
 
 #define TERM_INFO "\x1b[36m"
 #define TERM_WARNING "\x1b[33m"

@@ -14,6 +14,22 @@ void PROCESS(void) { process_game(); }
 
 void draw_main_menu(f32 delta) {}
 
+#ifdef DEBUG
+struct {
+    f64 times[120];
+    u32 cursor
+} frame_times = {};
+
+static inline f64 mean(f64 times[120]) {
+    f64 answer = 0;
+    for (i32 i = 0; i < 120; i++) {
+        answer += times[i];
+    }
+    answer /= 120.0;
+    return answer;
+}
+#endif
+
 void DRAW(RenderTexture2D target) {
     f32 delta = GetFrameTime();
     f32 screen_scale =
@@ -56,10 +72,20 @@ void DRAW(RenderTexture2D target) {
         (Rectangle){vpdraw_x, vpdraw_y, vpwidth_scaled, vpheight_scaled},
         (Vector2){0, 0}, 0, WHITE);
 
-    draw_outlined_text_ex(TextFormat("%d", GetFPS()), assets.fonts.fusion,
-                          (Vector2){16.0f, 16.0f},
-                          (float)assets.fonts.fusion.baseSize * 8, 0,
+    draw_outlined_text_ex(TextFormat("FPS: %d", GetFPS()),
+                          assets.fonts.fusion, (Vector2){16.0f, 4},
+                          (float)assets.fonts.fusion.baseSize * 4, 0,
                           WHITE, BLACK, 2);
+    draw_outlined_text_ex(TextFormat("OBJECTS: %d", entity_count()),
+                          assets.fonts.fusion, (Vector2){16.0f, 48.0f},
+                          (float)assets.fonts.fusion.baseSize * 4, 0,
+                          WHITE, BLACK, 2);
+#ifdef DEBUG
+    draw_outlined_text_ex(
+        TextFormat("%.04f ms", mean(frame_times.times) * 1000.0f),
+        assets.fonts.fusion, (Vector2){16.0f, 128.0f},
+        assets.fonts.fusion.baseSize * 2, 0, WHITE, BLACK, 2);
+#endif
 
     EndDrawing();
 }
@@ -83,7 +109,15 @@ i32 main(void) {
 
     reset_entities();
     while (!WindowShouldClose()) {
+#ifdef DEBUG
+        frame_times.times[frame_times.cursor] = GetTime();
+#endif
         PROCESS();
+#ifdef DEBUG
+        frame_times.times[frame_times.cursor] =
+            GetTime() - frame_times.times[frame_times.cursor];
+        frame_times.cursor = (frame_times.cursor + 1) % 120;
+#endif
         DRAW(screen_target);
     }
 

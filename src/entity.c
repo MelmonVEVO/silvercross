@@ -1,11 +1,21 @@
 #include "entity.h"
+#include "bullet.h"
 #include "constants.h"
 #include "player.h"
 #include "raylib.h"
 #include "utils.h"
 #include <assert.h>
 #include <stddef.h>
-#include <string.h>
+
+#define STB_DS_IMPLEMENTATION
+#include "stb_ds.h"
+
+void entity_process_noop(Entity *self, f32 delta) {}
+void entity_draw_noop(Entity *self, f32 delta) {}
+void entity_init_noop(Entity *self) {}
+void entity_die_noop(Entity *self) {}
+void entity_hit_noop(Entity *self, Entity *other) {}
+void entity_damage_noop(Entity *self) {}
 
 const EntityBehaviours player_behaviours = {};
 
@@ -15,62 +25,145 @@ const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT] = {
             .process = process_player,
             .draw = draw_player,
             .init = init_player,
+            .die = entity_die_noop,
+            .hit = hit_player,
+            .damage = entity_damage_noop,
+        },
+    [ENTITY_BULLET] =
+        {
+            .process = process_bullet,
+            .draw = draw_bullet,
+            .init = init_bullet,
+            .die = entity_die_noop,
+            .hit = entity_hit_noop,
+            .damage = entity_damage_noop,
         },
 };
 Entities entities;
-
-typedef struct {
-    EntityHandle a;
-    EntityHandle b;
-} CollisionEvent;
 
 typedef struct {
     u32 entity_idxs[MAX_ENTITIES];
     int count;
 } PartitionCell;
 
+#define SPATIAL_PARTITION_CELL_SIZE 20
+#define PARTITION_GRID_WIDTH (VIEWPORT_WIDTH / SPATIAL_PARTITION_CELL_SIZE)
+#define PARTITION_GRID_HEIGHT                                             \
+    (VIEWPORT_HEIGHT / SPATIAL_PARTITION_CELL_SIZE)
+
 typedef struct {
     // Anything out of the viewport? Ignored!
-    PartitionCell cells[VIEWPORT_HEIGHT / 5][VIEWPORT_WIDTH / 5];
+    PartitionCell cells[PARTITION_GRID_HEIGHT][PARTITION_GRID_WIDTH];
 } SpatialPartition;
 
 #define MAX_COLLISIONS 5000
-#define SPATIAL_PARTITION_CELL_SIZE 20.0f
 
 SpatialPartition partition_grid = {};
-
-CollisionEvent collisions[MAX_COLLISIONS];
-u32 collision_count;
 
 static bool is_handle_valid(EntityHandle handle) {
     return handle.idx < MAX_ENTITIES;
 }
 
-static inline void add_collision(EntityHandle a, EntityHandle b) {
-    if (collision_count >= MAX_COLLISIONS) {
-        log_error("Trying to record too many collisions!");
-        assert(0 && "Trying to record too many collisions!");
-        return;
+typedef struct {
+    u32 a;
+    u32 b;
+} CollisionEvent;
+
+typedef struct {
+    CollisionEvent key;
+    u8 value;
+} CollisionEntry;
+
+static inline bool is_valid_collision(EntityType a, EntityType b) {
+    EntityType a_nrm = (EntityType)MIN(a, b);
+    EntityType b_nrm = (EntityType)MAX(a, b);
+    switch (a_nrm) {
+    case ENTITY_PLAYER:
+        return b_nrm == ENTITY_BULLET || b_nrm == ENTITY_ENEMY ||
+               b_nrm == ENTITY_MEDAL;
+    case ENTITY_BULLET:
+        return b_nrm == ENTITY_ENEMY;
+    case ENTITY_ENEMY:
+        return b_nrm == ENTITY_BOMB;
+    default:
+        return false;
     }
-    Entity *a_entity = get_entity_agnostic(a);
-    Entity *b_entity = get_entity_agnostic(b);
-    if (!a_entity || !b_entity)
-        return;
-    collisions[collision_count].a = a;
-    collisions[collision_count].b = b;
-    collision_count++;
 }
 
-void record_collisions(void) { collision_count = 0; }
+static inline void add_collision(CollisionEntry **map, u32 a, u32 b) {
+    Entity *a_entity = &entities.entities[a];
+    Entity *b_entity = &entities.entities[b];
+    if (!a_entity || !b_entity)
+        return;
+    u32 lower = MIN(a, b);
+    u32 higher = MAX(a, b);
 
-void resolve_collisions(void) {}
+    CollisionEvent event = (CollisionEvent){lower, higher};
+    hmput(*map, event, 1);
+}
 
-void resolve_other(void) {}
+void record_collisions(CollisionEntry **map) {
+    PartitionCell *current;
+    for (i32 y = 0; y < PARTITION_GRID_HEIGHT; y++) {
+        for (i32 x = 0; x < PARTITION_GRID_WIDTH; x++) {
+            current = &partition_grid.cells[y][x];
+
+            if (current->count < 2)
+                continue;
+
+            for (i32 i = 0; i < current->count; i++) {
+                u32 a_entity = current->entity_idxs[i];
+                for (i32 j = i + 1; j < current->count; j++) {
+                    u32 b_entity = current->entity_idxs[j];
+
+                    CollisionEvent event = (CollisionEvent){
+                        MIN(a_entity, b_entity), MAX(a_entity, b_entity)};
+                    ptrdiff_t exists = hmgeti(*map, event);
+                    if (exists >= 0)
+                        continue;
+
+                    Entity *a_entity_p = &entities.entities[a_entity];
+                    Entity *b_entity_p = &entities.entities[b_entity];
+                    Rectangle a_collision_box = create_centred_rectangle(
+                        a_entity_p->position.x, a_entity_p->position.y,
+                        a_entity_p->collision);
+                    Rectangle b_collision_box = create_centred_rectangle(
+                        b_entity_p->position.x, b_entity_p->position.y,
+                        b_entity_p->collision);
+                    bool colliding = CheckCollisionRecs(a_collision_box,
+                                                        b_collision_box);
+                    if ((!colliding) ||
+                        !is_valid_collision(a_entity_p->type,
+                                            b_entity_p->type))
+                        continue;
+
+                    add_collision(map, a_entity, b_entity);
+                }
+            }
+        }
+    }
+}
+
+void resolve_collisions(CollisionEntry *map) {
+    CollisionEvent current;
+    u64 count = hmlen(map);
+    for (i32 i = 0; i < count; i++) {
+        current = map[i].key;
+        Entity *a = &entities.entities[current.a];
+        Entity *b = &entities.entities[current.b];
+        if (entity_has_behaviour(a, hit))
+            entity_hit(a, b);
+        if (entity_has_behaviour(b, hit))
+            entity_hit(b, a);
+    }
+}
+
+void resolve_other(void) {} // TODO: this thing
 
 void update_partition_grid(void) {
     Entity *current;
-    for (i32 i = 0; i < VIEWPORT_HEIGHT / 10; i++) {
-        for (i32 j = 0; j < VIEWPORT_WIDTH / 10; j++) {
+    for (i32 i = 0; i < PARTITION_GRID_HEIGHT; i++) {
+        for (i32 j = 0; j < PARTITION_GRID_WIDTH; j++) {
             partition_grid.cells[i][j].count = 0;
         }
     }
@@ -87,19 +180,19 @@ void update_partition_grid(void) {
         if (test_rectangle_offscreen(entity_bounds))
             continue;
 
-        xstart =
-            (i32)floorf(entity_bounds.x / SPATIAL_PARTITION_CELL_SIZE);
+        xstart = (i32)floorf(entity_bounds.x /
+                             (float)SPATIAL_PARTITION_CELL_SIZE);
         xend = (i32)floorf((entity_bounds.x + entity_bounds.width) /
-                           SPATIAL_PARTITION_CELL_SIZE);
-        ystart =
-            (i32)floorf(entity_bounds.y / SPATIAL_PARTITION_CELL_SIZE);
+                           (float)SPATIAL_PARTITION_CELL_SIZE);
+        ystart = (i32)floorf(entity_bounds.y /
+                             (float)SPATIAL_PARTITION_CELL_SIZE);
         yend = (i32)floorf((entity_bounds.y + entity_bounds.height) /
-                           SPATIAL_PARTITION_CELL_SIZE);
+                           (float)SPATIAL_PARTITION_CELL_SIZE);
 
         for (i32 y = MAX(0, ystart);
-             y <= MIN((VIEWPORT_HEIGHT / 10) - 1, yend); y++) {
+             y <= MIN(PARTITION_GRID_HEIGHT - 1, yend); y++) {
             for (i32 x = MAX(0, xstart);
-                 x <= MIN((VIEWPORT_WIDTH / 10) - 1, xend); x++) {
+                 x <= MIN(PARTITION_GRID_WIDTH - 1, xend); x++) {
                 partition_grid.cells[y][x]
                     .entity_idxs[partition_grid.cells[y][x].count] = i;
                 partition_grid.cells[y][x].count++;
@@ -117,10 +210,14 @@ void process_entities(f32 delta) {
         entity_process(current, delta);
     }
 
-    record_collisions();
-    resolve_collisions();
-    resolve_other();
     update_partition_grid();
+
+    CollisionEntry *collision_map = NULL;
+    record_collisions(&collision_map);
+    resolve_collisions(collision_map);
+    resolve_other();
+    // PERF: Keep in mind that deallocation might prove to be a bottleneck.
+    hmfree(collision_map);
 }
 
 Entity *spawn_entity(EntityType type) {
@@ -148,7 +245,7 @@ Entity *spawn_entity(EntityType type) {
 
     entities.live_entity_count++;
 
-    if (entity_behaviours[entity->type].init)
+    if (entity_has_behaviour(entity, init))
         entity_init(entity);
 
     return entity;
@@ -214,12 +311,12 @@ void reset_entities(void) {
 void draw_entities(f32 delta) {
 #ifdef DEBUG
     const Color aqua = {0, 255, 255, 255};
-    const i32 cell_size = (i32)SPATIAL_PARTITION_CELL_SIZE;
+    const i32 cell_size = SPATIAL_PARTITION_CELL_SIZE;
 
-    for (i32 y = 0; y < VIEWPORT_HEIGHT / cell_size; y++) {
-        for (i32 x = 0; x < VIEWPORT_WIDTH / cell_size; x++) {
+    for (i32 y = 0; y < PARTITION_GRID_HEIGHT; y++) {
+        for (i32 x = 0; x < PARTITION_GRID_WIDTH; x++) {
             PartitionCell *cell = &partition_grid.cells[y][x];
-            bool contains = cell->count > 0;
+            bool contains = cell->count > 2;
 
             DrawRectangle(x * cell_size, y * cell_size, cell_size - 1,
                           cell_size - 1, contains ? aqua : DARKBLUE);
@@ -253,3 +350,5 @@ Entity *get_entity_agnostic(EntityHandle handle) {
 
     return entity;
 }
+
+u32 entity_count(void) { return entities.live_entity_count; }

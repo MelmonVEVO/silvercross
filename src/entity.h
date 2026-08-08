@@ -7,26 +7,30 @@
 
 typedef enum {
     ENTITY_PLAYER,
-    ENITTY_BULLET,
+    ENTITY_BULLET,
     ENTITY_ENEMY,
     ENTITY_MEDAL,
     ENTITY_BOMB,
     ENTITY_TYPE_COUNT,
 } EntityType;
 
+typedef struct {
+
+    Vector2 additional_velocity;
+    f32 invincibility_time;
+    f32 hyper_gauge;
+    f32 collision_recovery_time;
+    u8 life;
+    u8 bombs;
+    bool focusing;
+    bool hyper_active;
+    bool counterbomb_active;
+    u8 counterbomb_frames;
+    f32 firing_time;
+} PlayerData;
+
 union EntityAs {
-    struct {
-        Vector2 additional_velocity;
-        f32 invincibility_time;
-        f32 hyper_gauge;
-        f32 collision_recovery_time;
-        u8 life;
-        u8 bombs;
-        bool focusing;
-        bool hyper_active;
-        bool counterbomb_active;
-        u8 counterbomb_frames;
-    } player;
+    PlayerData player;
     struct {
     } enemy;
     struct {
@@ -75,6 +79,13 @@ typedef struct {
     void (*damage)(Entity *self);
 } EntityBehaviours;
 
+void entity_process_noop(Entity *self, f32 delta);
+void entity_draw_noop(Entity *self, f32 delta);
+void entity_init_noop(Entity *self);
+void entity_die_noop(Entity *self);
+void entity_hit_noop(Entity *self, Entity *other);
+void entity_damage_noop(Entity *self);
+
 static inline bool entity_handle_is_none(EntityHandle handle) {
     return handle.idx >= MAX_ENTITIES;
 }
@@ -97,18 +108,21 @@ EntityHandle entity_handle_from_ptr(Entity *entity);
 
 extern const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT];
 #define entity_process(SELF, DELTA)                                       \
-    entity_behaviours[SELF->type].process(SELF, DELTA)
+    entity_behaviours[(SELF)->type].process((SELF), (DELTA))
 #define entity_draw(SELF, DELTA)                                          \
-    entity_behaviours[SELF->type].draw(SELF, DELTA)
+    entity_behaviours[(SELF)->type].draw((SELF), (DELTA))
 #define entity_init(SELF) entity_behaviours[SELF->type].init(SELF)
 #define entity_die(SELF) entity_behaviours[SELF->type].die(SELF)
 #define entity_hit(SELF, OTHER)                                           \
-    entity_behaviours[SELF->type].hit(SELF, OTHER)
+    entity_behaviours[(SELF)->type].hit((SELF), (OTHER))
 #define entity_damage(SELF) entity_behaviours[SELF->type].damage(SELF)
+#define entity_has_behaviour(SELF, BEHAVIOUR)                             \
+    (entity_behaviours[(SELF)->type].BEHAVIOUR != NULL)
 
 void reset_entities(void);
 void process_entities(f32 delta);
 void draw_entities(f32 delta);
+u32 entity_count(void);
 
 typedef struct {
     Entity entities[MAX_ENTITIES];

@@ -60,3 +60,30 @@ void init_player(Entity *player) {
     };
     player->collision = (Vector2){2.0f, 2.0f};
 }
+
+static void kill_player(Entity *self) {
+    PlayerData *player_data = &self->as.player;
+    if (player_data->invincibility_time > 0)
+        return;
+    if (player_data->counterbomb_active == true)
+        return;
+    /* unsigned int frames =  TODO: frame shit*/
+    player_data->counterbomb_active = true;
+    player_data->counterbomb_frames = PLAYER_COUNTERBOMB_WINDOW_FRAMES;
+}
+
+static void fully_kill_player(Entity *self) {
+    PlayerData *player_data = &self->as.player;
+    player_data->counterbomb_active = false;
+    player_data->counterbomb_frames = 1;
+    player_data->invincibility_time = PLAYER_INVINCIBILITY_TIME;
+    player_data->additional_velocity = Vector2Zero();
+    player_data->life -= 1;
+    player_data->firing_time = 0;
+    // make all medals stop following
+    // set medal chain gauge to 0
+    // stop focusing
+    // burst particles
+}
+
+void hit_player(Entity *self, Entity *other) {}
