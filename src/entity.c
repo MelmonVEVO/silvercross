@@ -11,9 +11,6 @@
 #include "assets.h"
 #endif
 
-#define STB_DS_IMPLEMENTATION
-#include "stb_ds.h"
-
 void entity_process_noop([[maybe_unused]] Entity *self,
                          [[maybe_unused]] f32 delta) {}
 void entity_draw_noop([[maybe_unused]] Entity *self,
@@ -46,7 +43,7 @@ const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT] = {
             .damage = entity_damage_noop,
         },
 };
-Entities entities;
+static Entities entities;
 
 typedef struct {
     u32 entity_idxs[MAX_ENTITIES];
@@ -65,7 +62,16 @@ typedef struct {
 
 #define MAX_COLLISIONS 5000
 
-SpatialPartition partition_grid = {};
+static SpatialPartition partition_grid = {};
+
+typedef struct {
+    i32 xstart;
+    i32 xend;
+    i32 ystart;
+    i32 yend;
+} EntityPartitionBounds;
+
+static EntityPartitionBounds partition_bounds[MAX_ENTITIES] = {};
 
 static bool is_handle_valid(EntityHandle handle) {
     return handle.idx < MAX_ENTITIES;
@@ -77,9 +83,11 @@ typedef struct {
 } CollisionEvent;
 
 typedef struct {
-    CollisionEvent key;
-    u8 value;
-} CollisionEntry;
+    CollisionEvent events[MAX_COLLISIONS];
+    u32 count;
+} CollisionList;
+
+CollisionList collision_list = {};
 
 static inline bool is_valid_collision(EntityType a, EntityType b) {
     EntityType a_nrm = (EntityType)MIN(a, b);
@@ -97,7 +105,12 @@ static inline bool is_valid_collision(EntityType a, EntityType b) {
     }
 }
 
-static inline void add_collision(CollisionEntry **map, u32 a, u32 b) {
+static inline void add_collision(u32 a, u32 b) {
+    if (collision_list.count == MAX_COLLISIONS) {
+        log_error("Tried to have too many collisions!");
+        return;
+    }
+
     Entity *a_entity = &entities.entities[a];
     Entity *b_entity = &entities.entities[b];
     if (!a_entity || !b_entity)
@@ -106,10 +119,10 @@ static inline void add_collision(CollisionEntry **map, u32 a, u32 b) {
     u32 higher = MAX(a, b);
 
     CollisionEvent event = (CollisionEvent){lower, higher};
-    hmput(*map, event, 1);
+    collision_list.events[collision_list.count++] = event;
 }
 
-void record_collisions(CollisionEntry **map) {
+void record_collisions(void) {
     PartitionCell *current;
     for (i32 y = 0; y < PARTITION_GRID_HEIGHT; y++) {
         for (i32 x = 0; x < PARTITION_GRID_WIDTH; x++) {
@@ -127,14 +140,20 @@ void record_collisions(CollisionEntry **map) {
                 for (i32 j = i + 1; j < current->count; j++) {
                     u32 b_entity = current->entity_idxs[j];
                     Entity *b_entity_p = &entities.entities[b_entity];
-                    if (!is_valid_collision(a_entity_p->type,
-                                            b_entity_p->type))
+
+                    EntityPartitionBounds *a_bounds =
+                        &partition_bounds[a_entity];
+                    EntityPartitionBounds *b_bounds =
+                        &partition_bounds[b_entity];
+
+                    i32 shared_x = MAX(a_bounds->xstart, b_bounds->xstart);
+                    i32 shared_y = MAX(a_bounds->ystart, b_bounds->ystart);
+
+                    if (x != shared_x || y != shared_y)
                         continue;
 
-                    CollisionEvent event = (CollisionEvent){
-                        MIN(a_entity, b_entity), MAX(a_entity, b_entity)};
-                    ptrdiff_t exists = hmgeti(*map, event);
-                    if (exists >= 0)
+                    if (!is_valid_collision(a_entity_p->type,
+                                            b_entity_p->type))
                         continue;
 
                     Rectangle b_collision_box = create_centred_rectangle(
@@ -145,18 +164,17 @@ void record_collisions(CollisionEntry **map) {
                     if (!colliding)
                         continue;
 
-                    add_collision(map, a_entity, b_entity);
+                    add_collision(a_entity, b_entity);
                 }
             }
         }
     }
 }
 
-void resolve_collisions(CollisionEntry *map) {
+void resolve_collisions(void) {
     CollisionEvent current;
-    u64 count = hmlen(map);
-    for (i32 i = 0; i < count; i++) {
-        current = map[i].key;
+    for (i32 i = 0; i < collision_list.count; i++) {
+        current = collision_list.events[i];
         Entity *a = &entities.entities[current.a];
         Entity *b = &entities.entities[current.b];
         if (entity_has_behaviour(a, hit))
@@ -197,13 +215,22 @@ void update_partition_grid(void) {
         yend = (i32)floorf((entity_bounds.y + entity_bounds.height) /
                            (float)SPATIAL_PARTITION_CELL_SIZE);
 
-        for (i32 y = MAX(0, ystart);
-             y <= MIN(PARTITION_GRID_HEIGHT - 1, yend); y++) {
-            for (i32 x = MAX(0, xstart);
-                 x <= MIN(PARTITION_GRID_WIDTH - 1, xend); x++) {
-                partition_grid.cells[y][x]
-                    .entity_idxs[partition_grid.cells[y][x].count] = i;
-                partition_grid.cells[y][x].count++;
+        xstart = MAX(0, xstart);
+        xend = MIN(PARTITION_GRID_WIDTH - 1, xend);
+        ystart = MAX(0, ystart);
+        yend = MIN(PARTITION_GRID_HEIGHT - 1, yend);
+
+        partition_bounds[i] = (EntityPartitionBounds){
+            .xstart = xstart,
+            .xend = xend,
+            .ystart = ystart,
+            .yend = yend,
+        };
+
+        for (i32 y = ystart; y <= yend; y++) {
+            for (i32 x = xstart; x <= xend; x++) {
+                PartitionCell *cell = &partition_grid.cells[y][x];
+                cell->entity_idxs[cell->count++] = i;
             }
         }
     }
@@ -220,12 +247,10 @@ void process_entities(f32 delta) {
 
     update_partition_grid();
 
-    CollisionEntry *collision_map = NULL;
-    record_collisions(&collision_map);
-    resolve_collisions(collision_map);
+    collision_list.count = 0;
+    record_collisions();
+    resolve_collisions();
     resolve_other();
-    // PERF: Keep in mind that deallocation might prove to be a bottleneck.
-    hmfree(collision_map);
 }
 
 Entity *spawn_entity(EntityType type) {
