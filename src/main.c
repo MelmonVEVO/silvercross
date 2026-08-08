@@ -101,7 +101,7 @@ i32 main(void) {
     HideCursor();
     ChangeDirectory("res");
     load_assets();
-    SetTargetFPS(120);
+    SetTargetFPS(FRAMERATE);
 
     RenderTexture2D screen_target =
         LoadRenderTexture(VIEWPORT_WIDTH, VIEWPORT_HEIGHT);

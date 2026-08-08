@@ -3,6 +3,7 @@
 
 #include "constants.h"
 #include "primitives.h"
+#include "utils.h"
 #include <raylib.h>
 
 typedef enum {
@@ -29,8 +30,28 @@ typedef struct {
     f32 firing_time;
 } PlayerData;
 
+typedef struct BulletConfig {
+    f32 initial_speed;
+    f32 acceleration;
+    f32 angular_velocity;
+    Vector2 gravity;
+    f32 initial_ttl;
+    /* f32 acceleration_start_time; */
+    const AnimatedTexture2D *bullet_texture;
+    u8 flags;
+    u8 texture_row;
+} BulletConfig;
+
+typedef struct {
+    BulletConfig config;
+    f32 ttl;
+    f32 acceleration;
+    AnimatedTexture2DInstance texture_instance;
+} BulletData;
+
 union EntityAs {
     PlayerData player;
+    BulletData bullet;
     struct {
     } enemy;
     struct {

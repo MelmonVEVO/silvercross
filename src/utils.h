@@ -10,7 +10,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "constants.h"
 #include <raylib.h>
 #include <raymath.h>
 #include <stdint.h>
@@ -135,9 +134,6 @@ Vector2 animated_texture_frame_size(const AnimatedTexture2D *texture);
 
 // Returns the total time it takes to animate a texture once.
 float total_animation_time(const AnimatedTexture2D *texture);
-
-// Returns the angle in degrees pointing from some position to the player.
-float front_towards_player(Vector2 position);
 
 // Provides the angle in degrees from from to to.
 static inline float front_towards_whatever(Vector2 from, Vector2 to) {

@@ -1,5 +1,6 @@
 #include "constants.h"
 #include "entity.h"
+#include "utils.h"
 #include <raylib.h>
 #include <raymath.h>
 
@@ -49,6 +50,8 @@ void process_player(Entity *player, f32 delta) {
 }
 
 void draw_player(Entity *player, f32 delta) {
+    DrawRectangle(player->position.x - 8, player->position.y - 8, 16, 16,
+                  WHITE);
     DrawRectangle(player->position.x - 1, player->position.y - 1, 2, 2,
                   RED);
 }
@@ -62,6 +65,7 @@ void init_player(Entity *player) {
 }
 
 static void kill_player(Entity *self) {
+    return; // TODO: remove this, just for the stress test
     PlayerData *player_data = &self->as.player;
     if (player_data->invincibility_time > 0)
         return;
@@ -86,4 +90,26 @@ static void fully_kill_player(Entity *self) {
     // burst particles
 }
 
-void hit_player(Entity *self, Entity *other) {}
+static void bonk_player(Entity *self) {}
+
+static void collect_medal(Entity *self) {}
+
+void hit_player(Entity *self, Entity *other) {
+    switch (other->type) {
+    case ENTITY_BULLET:
+        kill_player(self);
+        break;
+    case ENTITY_ENEMY:
+        bonk_player(self);
+        break;
+    case ENTITY_MEDAL:
+        collect_medal(self);
+        break;
+    default:
+    }
+}
+
+float front_towards_player(Vector2 position) {
+    return front_towards_whatever(
+        position, get_entity(player_ref, ENTITY_PLAYER)->position);
+}

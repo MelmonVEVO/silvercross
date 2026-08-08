@@ -1,6 +1,6 @@
 CompileFlags:
   Add:
+    - -xc
+    - -std=c23
     - -ferror-limit=0
-    - -I/home/kisaki/Documents/programming/mggj14/include
     - -I/home/kisaki/Documents/programming/mggj14/lib/raylib/src
-    - -I/home/kisaki/Documents/programming/mggj14/lib/rres/src

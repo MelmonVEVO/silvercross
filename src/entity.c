@@ -7,15 +7,22 @@
 #include <assert.h>
 #include <stddef.h>
 
+#ifdef DEBUG
+#include "assets.h"
+#endif
+
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
 
-void entity_process_noop(Entity *self, f32 delta) {}
-void entity_draw_noop(Entity *self, f32 delta) {}
-void entity_init_noop(Entity *self) {}
-void entity_die_noop(Entity *self) {}
-void entity_hit_noop(Entity *self, Entity *other) {}
-void entity_damage_noop(Entity *self) {}
+void entity_process_noop([[maybe_unused]] Entity *self,
+                         [[maybe_unused]] f32 delta) {}
+void entity_draw_noop([[maybe_unused]] Entity *self,
+                      [[maybe_unused]] f32 delta) {}
+void entity_init_noop([[maybe_unused]] Entity *self) {}
+void entity_die_noop([[maybe_unused]] Entity *self) {}
+void entity_hit_noop([[maybe_unused]] Entity *self,
+                     [[maybe_unused]] Entity *other) {}
+void entity_damage_noop([[maybe_unused]] Entity *self) {}
 
 const EntityBehaviours player_behaviours = {};
 
@@ -35,7 +42,7 @@ const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT] = {
             .draw = draw_bullet,
             .init = init_bullet,
             .die = entity_die_noop,
-            .hit = entity_hit_noop,
+            .hit = hit_bullet,
             .damage = entity_damage_noop,
         },
 };
@@ -113,8 +120,16 @@ void record_collisions(CollisionEntry **map) {
 
             for (i32 i = 0; i < current->count; i++) {
                 u32 a_entity = current->entity_idxs[i];
+                Entity *a_entity_p = &entities.entities[a_entity];
+                Rectangle a_collision_box = create_centred_rectangle(
+                    a_entity_p->position.x, a_entity_p->position.y,
+                    a_entity_p->collision);
                 for (i32 j = i + 1; j < current->count; j++) {
                     u32 b_entity = current->entity_idxs[j];
+                    Entity *b_entity_p = &entities.entities[b_entity];
+                    if (!is_valid_collision(a_entity_p->type,
+                                            b_entity_p->type))
+                        continue;
 
                     CollisionEvent event = (CollisionEvent){
                         MIN(a_entity, b_entity), MAX(a_entity, b_entity)};
@@ -122,19 +137,12 @@ void record_collisions(CollisionEntry **map) {
                     if (exists >= 0)
                         continue;
 
-                    Entity *a_entity_p = &entities.entities[a_entity];
-                    Entity *b_entity_p = &entities.entities[b_entity];
-                    Rectangle a_collision_box = create_centred_rectangle(
-                        a_entity_p->position.x, a_entity_p->position.y,
-                        a_entity_p->collision);
                     Rectangle b_collision_box = create_centred_rectangle(
                         b_entity_p->position.x, b_entity_p->position.y,
                         b_entity_p->collision);
                     bool colliding = CheckCollisionRecs(a_collision_box,
                                                         b_collision_box);
-                    if ((!colliding) ||
-                        !is_valid_collision(a_entity_p->type,
-                                            b_entity_p->type))
+                    if (!colliding)
                         continue;
 
                     add_collision(map, a_entity, b_entity);
@@ -161,13 +169,13 @@ void resolve_collisions(CollisionEntry *map) {
 void resolve_other(void) {} // TODO: this thing
 
 void update_partition_grid(void) {
-    Entity *current;
     for (i32 i = 0; i < PARTITION_GRID_HEIGHT; i++) {
         for (i32 j = 0; j < PARTITION_GRID_WIDTH; j++) {
             partition_grid.cells[i][j].count = 0;
         }
     }
 
+    Entity *current;
     for (i32 i = 0; i < MAX_ENTITIES; i++) {
         current = &entities.entities[i];
         if (!current->is_alive)
@@ -316,10 +324,12 @@ void draw_entities(f32 delta) {
     for (i32 y = 0; y < PARTITION_GRID_HEIGHT; y++) {
         for (i32 x = 0; x < PARTITION_GRID_WIDTH; x++) {
             PartitionCell *cell = &partition_grid.cells[y][x];
-            bool contains = cell->count > 2;
 
             DrawRectangle(x * cell_size, y * cell_size, cell_size - 1,
-                          cell_size - 1, contains ? aqua : DARKBLUE);
+                          cell_size - 1, BLUE);
+            DrawTextEx(assets.fonts.fusion, TextFormat("%d", cell->count),
+                       (Vector2){(x * cell_size) + 2, (y * cell_size) + 2},
+                       assets.fonts.fusion.baseSize, 0, BLACK);
         }
     }
 #endif

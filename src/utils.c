@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "constants.h"
 #include "primitives.h"
 #include <assert.h>
 #include <fcntl.h>

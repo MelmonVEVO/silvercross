@@ -219,7 +219,7 @@ static void draw_pixel_particle(const ParticleLive *particle) {
                      particle->texture_rotation, particle->tint);
 }
 
-static inline void draw_a_particle(ParticleLive *particle, float delta) {
+void draw_particle(ParticleLive *particle, float delta) {
     const ParticleConfig *config = particle->configuration;
     assert(config);
     int blend_mode = BLEND_ALPHA;
@@ -236,28 +236,6 @@ static inline void draw_a_particle(ParticleLive *particle, float delta) {
         draw_pixel_particle(particle);
     }
     EndBlendMode();
-}
-
-void draw_particles(float delta) {
-    for (size_t i = 0; i < MAX_PARTICLES; i++) {
-        ParticleLive *particle = &particles[i];
-        if (particle->current_lifetime <= 0 || !particle->configuration ||
-            particle->configuration->flags &
-                PARTICLEFLAG_HIGH_DRAW_PRIORITY)
-            continue;
-        draw_a_particle(particle, delta);
-    }
-}
-
-void draw_high_priority_particles(float delta) {
-    for (size_t i = 0; i < MAX_PARTICLES; i++) {
-        ParticleLive *particle = &particles[i];
-        if (particle->current_lifetime <= 0 || !particle->configuration ||
-            !(particle->configuration->flags &
-              PARTICLEFLAG_HIGH_DRAW_PRIORITY))
-            continue;
-        draw_a_particle(particle, delta);
-    }
 }
 
 void burst_particles(const ParticleConfig *configuration, Vector2 at,

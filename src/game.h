@@ -1,8 +1,6 @@
 #ifndef GAME_H
 #define GAME_H
 
-#include "constants.h"
-#include "entity.h"
 #include "primitives.h"
 
 typedef struct {
