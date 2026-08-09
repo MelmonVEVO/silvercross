@@ -13,9 +13,12 @@ typedef struct {
         AnimatedTexture2D bullets2;
         AnimatedTexture2D playershots;
         Texture2D tempplayer;
+        Texture2D medal;
+        Texture2D hud;
     } textures;
     struct {
         Sound medal_collect;
+        Sound bonk;
     } sfx;
 } Assets;
 

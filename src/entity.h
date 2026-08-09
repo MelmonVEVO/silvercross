@@ -54,11 +54,21 @@ typedef struct {
     AnimatedTexture2DInstance texture_instance;
 } BulletData;
 
+typedef enum { ENEMY_TEST_ENEMY, ENEMY_TYPE_COUNT } EnemyType;
+
+typedef struct {
+    EnemyType enemy_type;
+    union {
+        struct {
+            f32 time_until_shoot;
+        };
+    };
+} EnemyData;
+
 union EntityAs {
     PlayerData player;
     BulletData bullet;
-    struct {
-    } enemy;
+    EnemyData enemy;
     MedalData medal;
     struct {
     } bomb;
@@ -101,7 +111,7 @@ typedef struct {
     // Called when the entity collides with another.
     void (*hit)(Entity *self, Entity *other);
     // Called when the entity takes HP damage.
-    void (*damage)(Entity *self);
+    void (*damage)(Entity *self, f32 amount);
 } EntityBehaviours;
 
 void entity_process_noop(Entity *self, f32 delta);
@@ -109,7 +119,7 @@ void entity_draw_noop(Entity *self, f32 delta);
 void entity_init_noop(Entity *self);
 void entity_die_noop(Entity *self);
 void entity_hit_noop(Entity *self, Entity *other);
-void entity_damage_noop(Entity *self);
+void entity_damage_noop(Entity *self, f32 amount);
 
 static inline bool entity_handle_is_none(EntityHandle handle) {
     return handle.idx >= MAX_ENTITIES;
@@ -131,6 +141,9 @@ void destroy_entity(EntityHandle handle);
 void destroy_entity_ptr(Entity *entity);
 EntityHandle entity_handle_from_ptr(Entity *entity);
 
+// Moves an entity by its position and velocity
+void move_entity(Entity *entity, f32 delta);
+
 extern const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT];
 #define entity_process(SELF, DELTA)                                       \
     entity_behaviours[(SELF)->type].process((SELF), (DELTA))
@@ -140,7 +153,12 @@ extern const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT];
 #define entity_die(SELF) entity_behaviours[SELF->type].die(SELF)
 #define entity_hit(SELF, OTHER)                                           \
     entity_behaviours[(SELF)->type].hit((SELF), (OTHER))
-#define entity_damage(SELF) entity_behaviours[SELF->type].damage(SELF)
+#define entity_damage(SELF, AMOUNT)                                       \
+    {                                                                     \
+        entity_behaviours[SELF->type].damage(SELF, AMOUNT);               \
+        if (SELF->hp <= 0)                                                \
+            entity_die(SELF);                                             \
+    }
 #define entity_has_behaviour(SELF, BEHAVIOUR)                             \
     (entity_behaviours[(SELF)->type].BEHAVIOUR != NULL)
 

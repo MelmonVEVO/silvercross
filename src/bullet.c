@@ -12,9 +12,7 @@ void process_bullet(Entity *self, f32 delta) {
     self->as.bullet.ttl -= delta;
     if ((self->as.bullet.ttl <= 0) ||
         (self->position.y < -10.0f &&
-         self->as.bullet.config.flags & BULLETFLAG_PLAYER) ||
-        (test_rectangle_offscreen((Rectangle){
-            self->position.x - 1, self->position.y - 1, 2, 2})))
+         self->as.bullet.config.flags & BULLETFLAG_PLAYER))
         destroy_entity_ptr(self);
 }
 
@@ -53,8 +51,6 @@ static void fire(Vector2 initial_position, f32 direction,
     data->texture_instance.row = data->config.texture_row;
     data->ttl = data->config.initial_ttl;
 }
-
-void init_bullet(Entity *self) {}
 
 void hit_bullet(Entity *self, Entity *other) {
     if ((other->type == ENTITY_PLAYER &&
@@ -113,7 +109,6 @@ void bullet_fire_arc(Vector2 initial_position, float direction,
             bullet_angle = TAU * random_float();
             break;
         default:
-            break;
         }
         fire(start_position, bullet_angle, config);
     }

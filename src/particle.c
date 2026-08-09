@@ -268,3 +268,25 @@ void initialise_particle_pool(void) {
         particle_free = &particles[i];
     }
 }
+
+void draw_particles(float delta) {
+    for (size_t i = 0; i < MAX_PARTICLES; i++) {
+        ParticleLive *particle = &particles[i];
+        if (particle->current_lifetime <= 0 || !particle->configuration ||
+            particle->configuration->flags &
+                PARTICLEFLAG_HIGH_DRAW_PRIORITY)
+            continue;
+        draw_particle(particle, delta);
+    }
+}
+
+void draw_high_priority_particles(float delta) {
+    for (size_t i = 0; i < MAX_PARTICLES; i++) {
+        ParticleLive *particle = &particles[i];
+        if (particle->current_lifetime <= 0 || !particle->configuration ||
+            !(particle->configuration->flags &
+              PARTICLEFLAG_HIGH_DRAW_PRIORITY))
+            continue;
+        draw_particle(particle, delta);
+    }
+}

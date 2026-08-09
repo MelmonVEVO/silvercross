@@ -78,6 +78,9 @@ void burst_particles(const ParticleConfig *configuration, Vector2 at,
                      Colour tint);
 void process_particles(float delta);
 void draw_particle(ParticleLive *particle, float delta);
+void draw_particles(float delta);
+// TODO: improve so that we don't do two particle draw passes
+void draw_high_priority_particles(float delta);
 void reset_particles(void);
 void initialise_particle_pool(void);
 

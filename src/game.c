@@ -3,6 +3,7 @@
 #include "constants.h"
 #include "entity.h"
 #include "medal.h"
+#include "particle.h"
 #include "player.h"
 #include "primitives.h"
 #include "raymath.h"
@@ -17,21 +18,53 @@ static void process_paused_game(void) {}
 
 static f32 display_score = 0;
 static void draw_hud(f32 delta) {
-    display_score = Lerp(display_score, (f32)score, 6.0f * delta);
-    draw_outlined_text_ex(
-        TextFormat("%07d", (i32)display_score), assets.fonts.fusion,
-        (Vector2){4, 2}, assets.fonts.fusion.baseSize, 0, WHITE, BLACK, 1);
+    const Rectangle top_src = (Rectangle){
+        0,
+        0,
+        105.0f,
+        34.0f,
+    };
+    DrawTexturePro(assets.textures.hud, top_src, top_src, Vector2Zero(), 0,
+                   WHITE);
+    DrawRectangle(5, 32, 1, 10, WHITE);
+
+    u8 player_life = get_player_life();
+    const Rectangle bottom_src = (Rectangle){
+        0,
+        35.0f,
+        105.0f,
+        12.0f,
+    };
+    const Rectangle bottom_dst = (Rectangle){
+        0,
+        40.0f + (player_life > 0
+                     ? 9.0f + (4.0f * ((f32)player_life - 1.0f))
+                     : 0),
+        105.0f,
+        12.0f,
+    };
+    DrawTexturePro(assets.textures.hud, bottom_src, bottom_dst,
+                   Vector2Zero(), 0, WHITE);
+
+    display_score = Lerp(display_score, (f32)score, 12.0f * delta);
+    draw_outlined_text_ex(TextFormat("%08d", (i32)display_score),
+                          assets.fonts.fusion, (Vector2){9, -1},
+                          assets.fonts.fusion.baseSize, 0, WHITE, BLACK,
+                          1);
 
     const MedalsState medal_state = get_current_medals_state();
     draw_outlined_text_ex(
         TextFormat("%03d", (i32)floorf(medal_state.chain)),
-        assets.fonts.fusion, (Vector2){4, 14},
-        assets.fonts.fusion.baseSize, 0, WHITE, BLACK, 1);
+        assets.fonts.fusion, (Vector2){9, 13},
+        assets.fonts.fusion.baseSize * 2.0f, 0, WHITE, BLACK, 1);
+    draw_outlined_text_ex("chain", assets.fonts.fusion, (Vector2){36, 16},
+                          assets.fonts.fusion.baseSize, 0, WHITE, BLACK,
+                          1);
 
     Rectangle chain_gauge_bar = (Rectangle){
-        .x = 2,
-        .y = 28,
-        .width = 50,
+        .x = 6,
+        .y = 14,
+        .width = 55,
         .height = 2,
     };
     draw_progress_bar(
@@ -39,12 +72,23 @@ static void draw_hud(f32 delta) {
         Clamp(medal_state.chain_gauge / MEDAL_CHAIN_GAUGE_MAX, 0, 1.0f),
         BLACK, GREEN);
 
-    draw_outlined_text_ex(TextFormat("%d", get_player_health()),
-                          assets.fonts.fusion, (Vector2){4, 30},
-                          assets.fonts.fusion.baseSize, 0, RED, BLACK, 1);
-    draw_outlined_text_ex(TextFormat("%d", get_player_bombs()),
-                          assets.fonts.fusion, (Vector2){12, 30},
-                          assets.fonts.fusion.baseSize, 0, BLUE, BLACK, 1);
+    const Rectangle heart_src = (Rectangle){
+        0,
+        47.0f,
+        9.0f,
+        9.0f,
+    };
+    Rectangle heart_dst = (Rectangle){
+        1,
+        40.0f,
+        9.0f,
+        9.0f,
+    };
+    for (i32 i = 0; i < player_life; i++) {
+        DrawTexturePro(assets.textures.hud, heart_src, heart_dst,
+                       Vector2Zero(), 0, WHITE);
+        heart_dst.y += 4.0f;
+    }
 }
 
 static void draw_pause_overlay() {
@@ -56,8 +100,12 @@ static void draw_pause_overlay() {
 }
 
 void draw_game(f32 delta) {
+    process_particles(delta);
+    draw_particles(delta);
     draw_entities(delta);
     draw_hud(delta);
+    draw_high_priority_particles(
+        delta); // TODO: remove once draw layers are implemented
     if (paused) {
         draw_pause_overlay();
     }

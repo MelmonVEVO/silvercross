@@ -1,5 +1,6 @@
 #include "assets.h"
 #include "constants.h"
+#include "enemy.h"
 #include "entity.h"
 #include "game.h"
 #include "primitives.h"
@@ -74,12 +75,12 @@ void DRAW(RenderTexture2D target) {
 
     draw_outlined_text_ex(TextFormat("FPS: %d", GetFPS()),
                           assets.fonts.fusion, (Vector2){16.0f, 4},
-                          (float)assets.fonts.fusion.baseSize * 4, 0,
-                          WHITE, BLACK, 2);
+                          (f32)assets.fonts.fusion.baseSize * 4, 0, WHITE,
+                          BLACK, 2);
     draw_outlined_text_ex(TextFormat("ENTITIES: %d", entity_count()),
                           assets.fonts.fusion, (Vector2){16.0f, 48.0f},
-                          (float)assets.fonts.fusion.baseSize * 4, 0,
-                          WHITE, BLACK, 2);
+                          (f32)assets.fonts.fusion.baseSize * 4, 0, WHITE,
+                          BLACK, 2);
 #ifdef DEBUG
     draw_outlined_text_ex(
         TextFormat("%.04f ms", mean(frame_times.times) * 1000.0f),
@@ -109,6 +110,7 @@ i32 main(void) {
     SetTextureFilter(screen_target.texture, TEXTURE_FILTER_POINT);
 
     reset_game();
+    spawn_enemy(ENEMY_TEST_ENEMY, (Vector2){VIEWPORT_WIDTH / 2.0f, 60.0f});
     while (!WindowShouldClose()) {
 #ifdef DEBUG
         frame_times.times[frame_times.cursor] = GetTime();

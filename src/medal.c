@@ -43,10 +43,13 @@ void process_medal(Entity *self, f32 delta) {
     self->velocity.y =
         MIN(self->velocity.y + (MEDAL_GRAVITY * delta), MEDAL_GRAVITY);
     move(&self->position, self->velocity, delta);
+    f32 attract_circle_radius = IsKeyDown(KEY_Z)
+                                    ? ATTRACT_CIRCLE_RADIUS
+                                    : ATTRACT_CIRCLE_RADIUS_LARGE;
     bool close_enough = Vector2LengthSqr(Vector2Subtract(player_position(),
                                                          self->position)) <
-                        ATTRACT_CIRCLE_RADIUS * ATTRACT_CIRCLE_RADIUS;
-    if (!IsKeyDown(KEY_Z) || close_enough) {
+                        attract_circle_radius * attract_circle_radius;
+    if (close_enough) {
         self->as.medal.is_following_player = true;
     }
 
@@ -55,15 +58,15 @@ void process_medal(Entity *self, f32 delta) {
     }
 }
 
-void draw_medal(Entity *self, f32 delta) {
-    DrawCircle(self->position.x, self->position.y, 6.0f, ORANGE);
+void draw_medal(Entity *self, [[maybe_unused]] f32 delta) {
+    draw_centred_texture(assets.textures.medal, self->position);
 }
 
 void init_medal(Entity *self) {
-    float angle = (random_float() * (PI / 6)) - (PI / 12);
+    const f32 angle = (random_float() * (PI / 6)) - (PI / 12);
     self->velocity = Vector2Rotate(
         Vector2Scale(VECTOR2UP, 200.0f + (50.0f * random_float())), angle);
-    self->collision = (Vector2){6, 6};
+    self->collision = (Vector2){9, 9};
 }
 
 void hit_medal(Entity *self, Entity *other) {

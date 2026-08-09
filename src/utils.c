@@ -70,10 +70,11 @@ void draw_centred_texture(Texture2D texture, Vector2 at) {
 
 void draw_centred_texture_ex(Texture2D texture, Vector2 at, float rotation,
                              float scale, Colour tint) {
-    Rectangle source = (Rectangle){0, 0, texture.width, texture.height};
-    Rectangle dest = (Rectangle){at.x, at.y, texture.width * scale,
-                                 texture.height * scale};
-    Vector2 origin = {
+    const Rectangle source =
+        (Rectangle){0, 0, texture.width, texture.height};
+    const Rectangle dest = (Rectangle){at.x, at.y, texture.width * scale,
+                                       texture.height * scale};
+    const Vector2 origin = {
         floorf(dest.width / 2.0f),
         floorf(dest.height / 2.0f)}; // should I keep the floorf?
     DrawTexturePro(texture, source, dest, origin, rotation, tint);
@@ -110,15 +111,15 @@ void draw_animated_texture_ex_nostep(AnimatedTexture2DInstance *instance,
                    rotation, tint);
 }
 
-float total_animation_time(const AnimatedTexture2D *texture) {
-    const float seconds_per_frame = 1.0f / texture->fps;
+f32 total_animation_time(const AnimatedTexture2D *texture) {
+    const f32 seconds_per_frame = 1.0f / texture->fps;
     return seconds_per_frame * texture->frames;
 }
 
-int draw_animated_texture_ex(AnimatedTexture2DInstance *instance,
+i32 draw_animated_texture_ex(AnimatedTexture2DInstance *instance,
                              float delta, Vector2 position, float rotation,
                              float scale, Colour tint) {
-    float new_animation_time =
+    const f32 new_animation_time =
         fmodf(instance->animation_time + delta,
               total_animation_time(instance->texture));
     draw_animated_texture_ex_nostep(instance, position, rotation, scale,
@@ -155,15 +156,15 @@ void draw_animated_texture_pro_nostep(AnimatedTexture2DInstance *instance,
                    rotation, tint);
 }
 
-int draw_animated_texture_pro(AnimatedTexture2DInstance *instance,
+i32 draw_animated_texture_pro(AnimatedTexture2DInstance *instance,
                               float delta, Rectangle dest, Vector2 origin,
                               float rotation, Colour tint) {
-    float new_animation_time =
+    const f32 new_animation_time =
         fmodf(instance->animation_time + delta,
               total_animation_time(instance->texture));
     draw_animated_texture_pro_nostep(instance, dest, origin, rotation,
                                      tint);
-    int result = new_animation_time < instance->animation_time;
+    const i32 result = new_animation_time < instance->animation_time;
     instance->animation_time = new_animation_time;
     return result;
 }
@@ -357,9 +358,9 @@ void draw_cool_hexagon_thing(Vector2 at, Colour colour) {
 }
 
 const char *time_format(float time, bool ms) {
-    int minutes = (int)floorf(time / 60.0f);
-    int seconds = (int)floorf(fmodf(time, 60.0f));
-    int millis = 0;
+    const i32 minutes = (int)floorf(time / 60.0f);
+    const i32 seconds = (int)floorf(fmodf(time, 60.0f));
+    i32 millis = 0;
     if (ms) {
         millis = (int)floorf(100.0f * fmodf(time, 1.0f));
         return TextFormat("%02d:%02d.%02d", minutes, seconds, millis);
@@ -368,8 +369,8 @@ const char *time_format(float time, bool ms) {
 }
 
 bool test_rectangle_offscreen(Rectangle rect) {
-    f32 xend = rect.x + rect.width;
-    f32 yend = rect.y + rect.height;
+    const f32 xend = rect.x + rect.width;
+    const f32 yend = rect.y + rect.height;
 
     return rect.x >= VIEWPORT_WIDTH || xend < 0 ||
            rect.y >= VIEWPORT_HEIGHT || yend < 0;

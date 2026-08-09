@@ -1,6 +1,7 @@
 #include "entity.h"
 #include "bullet.h"
 #include "constants.h"
+#include "enemy.h"
 #include "medal.h"
 #include "player.h"
 #include "raylib.h"
@@ -20,7 +21,7 @@ void entity_init_noop([[maybe_unused]] Entity *self) {}
 void entity_die_noop([[maybe_unused]] Entity *self) {}
 void entity_hit_noop([[maybe_unused]] Entity *self,
                      [[maybe_unused]] Entity *other) {}
-void entity_damage_noop([[maybe_unused]] Entity *self) {}
+void entity_damage_noop(Entity *self, f32 amount) { self->hp -= amount; }
 
 const EntityBehaviours player_behaviours = {};
 
@@ -38,7 +39,7 @@ const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT] = {
         {
             .process = process_bullet,
             .draw = draw_bullet,
-            .init = init_bullet,
+            .init = entity_init_noop,
             .die = entity_die_noop,
             .hit = hit_bullet,
             .damage = entity_damage_noop,
@@ -51,6 +52,15 @@ const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT] = {
             .die = entity_die_noop,
             .hit = hit_medal,
             .damage = entity_damage_noop,
+        },
+    [ENTITY_ENEMY] =
+        {
+            .process = process_enemy,
+            .draw = draw_enemy,
+            .init = entity_init_noop,
+            .die = die_enemy,
+            .hit = hit_enemy,
+            .damage = damage_enemy,
         },
 };
 static Entities entities;
@@ -254,6 +264,7 @@ void process_entities(f32 delta) {
         if (!current->is_alive)
             continue;
         entity_process(current, delta);
+        current->time_alive += delta;
     }
 
     update_partition_grid();
@@ -400,3 +411,7 @@ Entity *get_entity_agnostic(EntityHandle handle) {
 }
 
 u32 entity_count(void) { return entities.live_entity_count; }
+
+void move_entity(Entity *entity, f32 delta) {
+    move(&entity->position, entity->velocity, delta);
+}

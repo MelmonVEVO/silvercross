@@ -81,7 +81,6 @@ u32 cancel_bullets(bool spawn_crystals, bool spawn_the_particle);
 
 void process_bullet(Entity *self, f32 delta);
 void draw_bullet(Entity *self, f32 delta);
-void init_bullet(Entity *self);
 void hit_bullet(Entity *self, Entity *other);
 
 #endif // BULLET_H
