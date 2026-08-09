@@ -5,7 +5,7 @@ ifeq ($(OS),Windows_NT)
 	OS := windows
 endif
 
-TARGET_BASE := MagicalShootyGame
+TARGET_BASE := HeavenlySilvercross
 SO_NAME := magical.so
 TARGET := $(TARGET_BASE)
 

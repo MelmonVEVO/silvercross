@@ -16,13 +16,14 @@ typedef enum {
 } EntityType;
 
 typedef struct {
-
     Vector2 additional_velocity;
+    Vector2 options_position;
     f32 invincibility_time;
     f32 hyper_gauge;
     f32 collision_recovery_time;
     u8 life;
-    u8 bombs;
+    u8 bomber_stock;
+    u16 medals_until_next_bomber;
     bool focusing;
     bool hyper_active;
     bool counterbomb_active;
@@ -43,6 +44,10 @@ typedef struct BulletConfig {
 } BulletConfig;
 
 typedef struct {
+    bool is_following_player;
+} MedalData;
+
+typedef struct {
     BulletConfig config;
     f32 ttl;
     f32 acceleration;
@@ -54,8 +59,7 @@ union EntityAs {
     BulletData bullet;
     struct {
     } enemy;
-    struct {
-    } medal;
+    MedalData medal;
     struct {
     } bomb;
 };

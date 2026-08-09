@@ -37,7 +37,7 @@ void DRAW(RenderTexture2D target) {
             floorf((f32)GetScreenHeight() / (f32)VIEWPORT_HEIGHT));
 
     BeginTextureMode(target);
-    ClearBackground(BLACK);
+    ClearBackground(DARKGRAY);
     if (is_gameplay)
         draw_game(delta);
     else
@@ -76,7 +76,7 @@ void DRAW(RenderTexture2D target) {
                           assets.fonts.fusion, (Vector2){16.0f, 4},
                           (float)assets.fonts.fusion.baseSize * 4, 0,
                           WHITE, BLACK, 2);
-    draw_outlined_text_ex(TextFormat("OBJECTS: %d", entity_count()),
+    draw_outlined_text_ex(TextFormat("ENTITIES: %d", entity_count()),
                           assets.fonts.fusion, (Vector2){16.0f, 48.0f},
                           (float)assets.fonts.fusion.baseSize * 4, 0,
                           WHITE, BLACK, 2);
@@ -94,7 +94,8 @@ typedef void *magical_main(void *data);
 
 i32 main(void) {
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, "Magical Girl Shoot");
+    InitWindow(VIEWPORT_WIDTH, VIEWPORT_HEIGHT,
+               "JUDGEMENT OF HEAVENLY SILVERCROSS");
     SetWindowMinSize(VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
     SetExitKey(KEY_NULL);
     InitAudioDevice();
@@ -107,7 +108,7 @@ i32 main(void) {
         LoadRenderTexture(VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
     SetTextureFilter(screen_target.texture, TEXTURE_FILTER_POINT);
 
-    reset_entities();
+    reset_game();
     while (!WindowShouldClose()) {
 #ifdef DEBUG
         frame_times.times[frame_times.cursor] = GetTime();

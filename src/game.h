@@ -3,8 +3,8 @@
 
 #include "primitives.h"
 
-typedef struct {
-} World;
+void add_score(u32 extra_score);
+void reset_game(void);
 
 void process_game(void);
 void draw_game(f32 delta);

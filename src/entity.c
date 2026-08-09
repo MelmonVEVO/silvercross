@@ -1,6 +1,7 @@
 #include "entity.h"
 #include "bullet.h"
 #include "constants.h"
+#include "medal.h"
 #include "player.h"
 #include "raylib.h"
 #include "utils.h"
@@ -42,9 +43,28 @@ const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT] = {
             .hit = hit_bullet,
             .damage = entity_damage_noop,
         },
+    [ENTITY_MEDAL] =
+        {
+            .process = process_medal,
+            .draw = draw_medal,
+            .init = init_medal,
+            .die = entity_die_noop,
+            .hit = hit_medal,
+            .damage = entity_damage_noop,
+        },
 };
 static Entities entities;
 
+// BUG: I don't know how I managed to fuck up spatial partitioning this
+// bad, using a naive IxJ approach is genuinely an improvement, as proved
+// by THE LUMINOUS RUIN. Too late now. I'll look at it if I have time at
+// the end of the jam.
+// INFO: What I could change it to: iterate through the grid, for each
+// entity whose top left corner inhabits the cell, if not already checked,
+// check right and down. OR SOMETHING LIKE THAT.
+// I'd also like to change the update function so it doesn't rebuild the
+// entire grid from scratch every frame, but I've profiled the thing and
+// most of the performance bottleneck is within record_collisions.
 typedef struct {
     u32 entity_idxs[MAX_ENTITIES];
     int count;
@@ -329,11 +349,13 @@ void reset_entities(void) {
     }
     entities.free_next[MAX_ENTITIES - 1] = MAX_ENTITIES;
 
-    spawn_entity(ENTITY_PLAYER);
+    Entity *player = spawn_entity(ENTITY_PLAYER);
+    extern EntityHandle player_ref;
+    player_ref = entity_handle_from_ptr(player);
 }
 
 void draw_entities(f32 delta) {
-#ifdef DEBUG
+#ifdef PARTITION_DISPLAY
     const Color aqua = {0, 255, 255, 255};
     const i32 cell_size = SPATIAL_PARTITION_CELL_SIZE;
 
