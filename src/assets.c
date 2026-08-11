@@ -18,4 +18,8 @@ void load_assets(void) {
     assets.textures.medal = LoadTexture("sprites/medal.png");
     assets.sfx.bonk = LoadSound("audio/sfx/bonk.wav");
     assets.textures.hud = LoadTexture("sprites/hud.png");
+    assets.textures.seal = LoadTexture("sprites/seal.png");
+    assets.textures.playershot_impact =
+        load_animated_texture("sprites/playerbullet_impact.png", 7, 1, 30);
+    assets.textures.star = LoadTexture("sprites/bullet_star.png");
 }

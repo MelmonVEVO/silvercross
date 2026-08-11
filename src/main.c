@@ -3,6 +3,7 @@
 #include "enemy.h"
 #include "entity.h"
 #include "game.h"
+#include "particle.h"
 #include "primitives.h"
 #include "utils.h"
 #include <dlfcn.h>
@@ -111,6 +112,7 @@ i32 main(void) {
 
     reset_game();
     spawn_enemy(ENEMY_TEST_ENEMY, (Vector2){VIEWPORT_WIDTH / 2.0f, 60.0f});
+    initialise_particle_pool();
     while (!WindowShouldClose()) {
 #ifdef DEBUG
         frame_times.times[frame_times.cursor] = GetTime();

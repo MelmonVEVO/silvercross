@@ -18,12 +18,10 @@ void entity_process_noop([[maybe_unused]] Entity *self,
 void entity_draw_noop([[maybe_unused]] Entity *self,
                       [[maybe_unused]] f32 delta) {}
 void entity_init_noop([[maybe_unused]] Entity *self) {}
-void entity_die_noop([[maybe_unused]] Entity *self) {}
+void entity_die_noop(Entity *self) { self->is_alive = false; }
 void entity_hit_noop([[maybe_unused]] Entity *self,
                      [[maybe_unused]] Entity *other) {}
 void entity_damage_noop(Entity *self, f32 amount) { self->hp -= amount; }
-
-const EntityBehaviours player_behaviours = {};
 
 const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT] = {
     [ENTITY_PLAYER] =
@@ -63,6 +61,14 @@ const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT] = {
             .damage = damage_enemy,
         },
 };
+
+typedef struct {
+    Entity entities[MAX_ENTITIES];
+    u32 free_next[MAX_ENTITIES];
+    u32 free_head;
+    u32 live_entity_count;
+} Entities;
+
 static Entities entities;
 
 // BUG: I don't know how I managed to fuck up spatial partitioning this
@@ -207,7 +213,15 @@ void resolve_collisions(void) {
     }
 }
 
-void resolve_other(void) {} // TODO: this thing
+void resolve_other(void) {
+    Entity *current;
+    for (i32 i = 0; i < MAX_ENTITIES; i++) {
+        current = &entities.entities[i];
+        if (current->hp <= 0 && current->is_alive) {
+            entity_die(current);
+        }
+    }
+}
 
 void update_partition_grid(void) {
     for (i32 i = 0; i < PARTITION_GRID_HEIGHT; i++) {
@@ -219,7 +233,7 @@ void update_partition_grid(void) {
     Entity *current;
     for (i32 i = 0; i < MAX_ENTITIES; i++) {
         current = &entities.entities[i];
-        if (!current->is_alive)
+        if (!current->is_active)
             continue;
 
         i32 xstart, xend, ystart, yend;
@@ -261,7 +275,7 @@ void process_entities(f32 delta) {
     Entity *current;
     for (i32 i = 0; i < MAX_ENTITIES; i++) {
         current = &entities.entities[i];
-        if (!current->is_alive)
+        if (!current->is_active)
             continue;
         entity_process(current, delta);
         current->time_alive += delta;
@@ -294,6 +308,7 @@ Entity *spawn_entity(EntityType type) {
     u32 generation = entity->generation;
     *entity = (Entity){};
     entity->type = type;
+    entity->is_active = true;
     entity->is_alive = true;
     entity->generation = generation;
     entity->parent = ENTITY_HANDLE_NONE;
@@ -321,7 +336,7 @@ EntityHandle entity_handle_from_ptr(Entity *entity) {
     if (offset % sizeof(Entity) != 0)
         return ENTITY_HANDLE_NONE;
 
-    unsigned int index = (unsigned int)(offset / sizeof(Entity));
+    u32 index = (u32)(offset / sizeof(Entity));
     return (EntityHandle){
         .idx = index, .generation = entities.entities[index].generation};
 }
@@ -386,7 +401,7 @@ void draw_entities(f32 delta) {
     Entity *current;
     for (i32 i = 0; i < MAX_ENTITIES; i++) {
         current = &entities.entities[i];
-        if (!current->is_alive)
+        if (!current->is_active)
             continue;
         entity_draw(current, delta);
     }
@@ -404,7 +419,7 @@ Entity *get_entity_agnostic(EntityHandle handle) {
         return NULL;
 
     Entity *entity = &entities.entities[handle.idx];
-    if (!entity->is_alive || entity->generation != handle.generation)
+    if (!entity->is_active || entity->generation != handle.generation)
         return NULL;
 
     return entity;
@@ -414,4 +429,38 @@ u32 entity_count(void) { return entities.live_entity_count; }
 
 void move_entity(Entity *entity, f32 delta) {
     move(&entity->position, entity->velocity, delta);
+}
+
+u32 cancel_bullets(bool spawn_crystals,
+                   [[maybe_unused]] bool spawn_the_particle) {
+    Entity *current;
+    u32 count = 0;
+    for (i32 i = 0; i < MAX_ENTITIES; i++) {
+        current = &entities.entities[i];
+        Vector2 position = current->position;
+        if (!(current->type == ENTITY_BULLET))
+            continue;
+
+        destroy_entity_ptr(current);
+        if (spawn_crystals) {
+            Entity *medal = spawn_entity(ENTITY_MEDAL);
+            medal->position = position;
+        }
+        // TODO: particle
+        count++;
+    }
+    return count;
+}
+
+Vector2 entity_world_position(Entity *entity) {
+    EntityHandle parent = entity->parent;
+    if (!is_handle_valid(parent))
+        return entity->position;
+    Entity *parent_entity = get_entity_agnostic(parent);
+    if (!parent_entity) {
+        entity->parent = ENTITY_HANDLE_NONE;
+        return entity->position;
+    }
+    return Vector2Add(entity_world_position(parent_entity),
+                      entity->position);
 }

@@ -3,6 +3,7 @@
 #include "bullet.h"
 #include "constants.h"
 #include "entity.h"
+#include "particle.h"
 #include "utils.h"
 #include <float.h>
 #include <raylib.h>
@@ -160,7 +161,6 @@ static void fully_kill_player(Entity *self) {
     player_data->invincibility_time = PLAYER_INVINCIBILITY_TIME;
     player_data->additional_velocity = Vector2Zero();
     player_data->life -= 1;
-    player_data->firing_time = 0;
     // make all medals stop following
     // set medal chain gauge to 0
     // stop focusing

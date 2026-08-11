@@ -4,6 +4,7 @@
 #include "entity.h"
 
 void spawn_enemy(EnemyType type, Vector2 at);
+void setup_emitter(EmitterLive *emitter, const EmitterConfig *config);
 
 void process_enemy(Entity *self, f32 delta);
 void draw_enemy(Entity *self, f32 delta);
