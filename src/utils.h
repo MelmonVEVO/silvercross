@@ -208,4 +208,12 @@ bool test_rectangle_offscreen(Rectangle rect);
 // it uses that function's i32ernal buffer.
 const char *time_format(f32 time, bool ms);
 
+static inline f32 smoothstep(const f32 edge0, const f32 edge1,
+                             const f32 x) {
+    f32 reduced_x = Clamp((x - edge0) / (edge1 - edge0), 0, 1.0f);
+
+    return (3.0f * reduced_x * reduced_x) -
+           (2.0f * reduced_x * reduced_x * reduced_x);
+}
+
 #endif // UTILS_H

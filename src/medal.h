@@ -11,6 +11,7 @@ typedef struct {
 } MedalsState;
 
 void set_medal_chain_gauge_stop(bool stop);
+void set_medal_chain_gauge_0(void);
 
 void process_medals_state(f32 delta);
 const MedalsState get_current_medals_state(void);

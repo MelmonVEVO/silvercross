@@ -40,6 +40,9 @@ void process_medal(Entity *self, f32 delta) {
         move(&self->position, self->velocity, delta);
         return;
     }
+    self->as.medal.value =
+        MAX(MEDAL_LOWEST_VALUE,
+            self->as.medal.value - (MEDAL_VALUE_LOWERING_RATE * delta));
     self->velocity.y =
         MIN(self->velocity.y + (MEDAL_GRAVITY * delta), MEDAL_GRAVITY);
     move(&self->position, self->velocity, delta);
@@ -60,6 +63,10 @@ void process_medal(Entity *self, f32 delta) {
 
 void draw_medal(Entity *self, [[maybe_unused]] f32 delta) {
     draw_centred_texture(assets.textures.medal, self->position);
+    DrawTextEx(assets.fonts.fusion,
+               TextFormat("%d", (i32)self->as.medal.value),
+               Vector2Add(self->position, (Vector2){-5.0f, -8.0f}),
+               assets.fonts.fusion.baseSize, 0, MEDAL_TEXT_COLOUR);
 }
 
 void init_medal(Entity *self) {
@@ -67,6 +74,8 @@ void init_medal(Entity *self) {
     self->velocity = Vector2Rotate(
         Vector2Scale(VECTOR2UP, 200.0f + (50.0f * random_float())), angle);
     self->collision = (Vector2){9, 9};
+    self->as.medal = (MedalData){};
+    self->as.medal.value = MEDAL_INITIAL_VALUE;
 }
 
 void hit_medal(Entity *self, Entity *other) {
@@ -77,7 +86,8 @@ void hit_medal(Entity *self, Entity *other) {
     medals_state.chain += 1.0f;
 
     PlaySound(assets.sfx.medal_collect);
-    add_score(MEDAL_BASE_SCORE * (1.0f + (medals_state.chain / 100.0f)));
+    add_score((u32)floorf(self->as.medal.value *
+                          (1.0f + (medals_state.chain / 100.0f))));
 
     destroy_entity_ptr(self);
 }
@@ -85,5 +95,7 @@ void hit_medal(Entity *self, Entity *other) {
 void set_medal_chain_gauge_stop(bool stop) {
     medals_state.chain_gauge_stopped = stop;
 }
+
+void set_medal_chain_gauge_0(void) { medals_state.chain_gauge = 0; }
 
 void reset_medals_state(void) { medals_state = (MedalsState){}; }

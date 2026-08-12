@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <math.h>
 #include <raylib.h>
 #include <raymath.h>
 #include <stdarg.h>

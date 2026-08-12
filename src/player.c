@@ -3,7 +3,7 @@
 #include "bullet.h"
 #include "constants.h"
 #include "entity.h"
-#include "particle.h"
+#include "medal.h"
 #include "utils.h"
 #include <float.h>
 #include <raylib.h>
@@ -57,13 +57,40 @@ static void player_fire(Entity *player, f32 delta) {
     fire_rate -= delta;
 }
 
+static void fully_kill_player(Entity *self) {
+    PlayerData *player_data = &self->as.player;
+    player_data->counterbomb_active = false;
+    player_data->counterbomb_frames = 1;
+    player_data->invincibility_time = PLAYER_INVINCIBILITY_TIME;
+    /* player_data->additional_velocity = */
+    /*     VEC2FROMANGLE(2 * PI * random_float(), PLAYER_DEATH_YEET_SPEED);
+     */
+    player_data->life -= 1;
+    cancel_bullets(false, true);
+    set_medal_chain_gauge_0();
+    // play death sound
+    // burst particles
+}
+
 void process_player(Entity *player, f32 delta) {
-    player->as.player.options_position =
-        Vector2Lerp(player->as.player.options_position, player->position,
-                    16.0f * delta);
+    PlayerData *data = &player->as.player;
+
+    data->options_position = Vector2Lerp(data->options_position,
+                                         player->position, 16.0f * delta);
     player->hp = MIN(player->hp + delta, 2.0f);
-    player->as.player.collision_recovery_time -= delta;
-    player->as.player.invincibility_time -= delta;
+    data->collision_recovery_time -= delta;
+    data->invincibility_time -= delta;
+
+    if (data->counterbomb_active) {
+        data->counterbomb_frames--;
+        if (data->counterbomb_frames <= 0)
+            fully_kill_player(player);
+    }
+
+    if (data->life <= 0) {
+        data->invincibility_time = 1.0f;
+        return;
+    }
 
     player->velocity = Vector2Zero();
     if (IsKeyDown(KEY_LEFT))
@@ -85,8 +112,8 @@ void process_player(Entity *player, f32 delta) {
         player->velocity =
             Vector2Scale(Vector2Normalize(player->velocity), speed);
     }
-    Vector2 total_velocity = Vector2Add(
-        player->velocity, player->as.player.additional_velocity);
+    Vector2 total_velocity =
+        Vector2Add(player->velocity, data->additional_velocity);
 
     player->position.x =
         Clamp(player->position.x + (total_velocity.x * delta),
@@ -100,18 +127,31 @@ void process_player(Entity *player, f32 delta) {
     if (IsKeyDown(KEY_Z))
         player_fire(player, delta);
 
-    if (Vector2Length(player->as.player.additional_velocity) <= 15.0f) {
-        player->as.player.additional_velocity = Vector2Zero();
+    if (Vector2Length(data->additional_velocity) <= 15.0f) {
+        data->additional_velocity = Vector2Zero();
     }
 
-    player->as.player.additional_velocity =
-        Vector2Lerp(player->as.player.additional_velocity, Vector2Zero(),
-                    15.0f * delta);
+    data->additional_velocity = Vector2Lerp(data->additional_velocity,
+                                            Vector2Zero(), 15.0f * delta);
 }
 
 void draw_player(Entity *player, f32 delta) {
     static f32 marker_rotation = 0;
+
+    if (player->as.player.life == 0)
+        return;
+
+    f32 invincibility_time = player->as.player.invincibility_time;
+    f32 invincibility_opacity =
+        sinf(invincibility_time * 120.0f) > 0 ? 0.4 : 0;
     draw_centred_texture(assets.textures.tempplayer, player->position);
+    if (invincibility_time > 0) {
+        BeginBlendMode(BLEND_ADDITIVE);
+        draw_centred_texture_ex(assets.textures.tempplayer,
+                                player->position, 0, 1.0f,
+                                Fade(WHITE, invincibility_opacity));
+        EndBlendMode();
+    }
     DrawRectanglePro(
         (Rectangle){player->position.x, player->position.y, 4.0f, 4.0f},
         (Vector2){2.0f, 2.0f}, marker_rotation,
@@ -124,6 +164,19 @@ void draw_player(Entity *player, f32 delta) {
         DrawCircle(position.x, position.y, 4, WHITE);
     }
     marker_rotation += 400.0f * delta;
+    if (invincibility_time > 0) {
+        f32 progress =
+            ((invincibility_time / PLAYER_INVINCIBILITY_TIME) * 360.0f) -
+            90.0f;
+        DrawRing(player->position, PLAYER_INVINCIBILITY_RING_RADIUS - 2.0f,
+                 PLAYER_INVINCIBILITY_RING_RADIUS, -90.0f, progress, 24,
+                 Fade(WHITE, invincibility_opacity + 0.4));
+        draw_outlined_text_ex("SAFE", assets.fonts.fusion,
+                              (Vector2){floorf(player->position.x - 11.0f),
+                                        floorf(player->position.y + 6.0f)},
+                              assets.fonts.fusion.baseSize, 0, SKYBLUE,
+                              BLACK, 1);
+    }
 }
 
 void init_player(Entity *player) {
@@ -143,28 +196,14 @@ void init_player(Entity *player) {
 }
 
 static void kill_player(Entity *self) {
-    return; // TODO: remove this, just for the stress test
     PlayerData *player_data = &self->as.player;
     if (player_data->invincibility_time > 0)
         return;
     if (player_data->counterbomb_active == true)
         return;
-    /* unsigned int frames =  TODO: frame shit*/
+    /* unsigned int frames =  TODO: frame shit */
     player_data->counterbomb_active = true;
     player_data->counterbomb_frames = PLAYER_COUNTERBOMB_WINDOW_FRAMES;
-}
-
-static void fully_kill_player(Entity *self) {
-    PlayerData *player_data = &self->as.player;
-    player_data->counterbomb_active = false;
-    player_data->counterbomb_frames = 1;
-    player_data->invincibility_time = PLAYER_INVINCIBILITY_TIME;
-    player_data->additional_velocity = Vector2Zero();
-    player_data->life -= 1;
-    // make all medals stop following
-    // set medal chain gauge to 0
-    // stop focusing
-    // burst particles
 }
 
 static void bonk_player(Entity *self, const Vector2 other_position,
@@ -200,6 +239,8 @@ static void collect_medal(Entity *self) {
 }
 
 void hit_player(Entity *self, Entity *other) {
+    if (self->as.player.life == 0)
+        return;
     switch (other->type) {
     case ENTITY_BULLET:
         kill_player(self);

@@ -9,6 +9,65 @@
 #include "utils.h"
 #include <assert.h>
 
+// -- Luciko --
+
+BulletConfig luciko_pat1_spiral_bullet = (BulletConfig){
+    .bullet_texture = &assets.textures.bullets1,
+    .texture_row = 0,
+    .initial_speed = 90.0f,
+    .initial_ttl = 10.0f,
+};
+
+PatternConfig luciko_pat1_spiral = (PatternConfig){
+    .pattern_type = BP_ONE,
+    .bullet_config = &luciko_pat1_spiral_bullet,
+    .spawn_offset = 4.0f,
+    .trajectory = TRJ_DEFAULT,
+};
+
+EmitterConfig luciko_pat1_spiral_emitter = (EmitterConfig){
+    .number_of_volleys = -1,
+    .pattern = &luciko_pat1_spiral,
+    .rotation_range = 360.0f,
+    .rotation_speed = 100.0f,
+    .rotation_type = ROT_CONTINUOUS,
+    .start_rotation = 90.0f,
+    .volley_rate = 24.0f,
+    .time_until_start = 0.5f,
+};
+
+BulletConfig luciko_pat1_arc_bullet = (BulletConfig){
+    .bullet_texture = &assets.textures.bullets1,
+    .texture_row = 1,
+    .initial_speed = 130.0f,
+    .initial_ttl = 5.0f,
+};
+
+PatternConfig luciko_pat1_arc = (PatternConfig){
+    .pattern_type = BP_ARC,
+    .bullet_config = &luciko_pat1_arc_bullet,
+    .trajectory = TRJ_DEFAULT,
+    .bullets_in_pattern = 7,
+    .pattern_length = 40.0f,
+    .burst_data =
+        {
+            .number_of_shots = 3,
+            .end_bullet_speed_modifier = 130.0f,
+            .end_bullets_in_pattern = 7,
+            .total_time = 0.85f,
+        },
+    .flags = PATTERNFLAG_HAS_BURST,
+};
+
+EmitterConfig luciko_pat1_arc_emitter = (EmitterConfig){
+    .pattern = &luciko_pat1_arc,
+    .rotation_range = 360.0f,
+    .rotation_type = ROT_TOWARDS_PLAYER,
+    .number_of_volleys = -1,
+    .time_until_start = 0.5f,
+    .volley_rate = 0.3f,
+};
+
 // -- Test enemy --
 
 BulletConfig test_enemy_bullet = (BulletConfig){

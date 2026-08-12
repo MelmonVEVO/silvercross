@@ -10,7 +10,6 @@ SO_NAME := magical.so
 TARGET := $(TARGET_BASE)
 
 SRC_DIR := ./src
-INC_DIR := ./include
 BUILD_DIR := ./out
 
 SRC := $(wildcard $(SRC_DIR)/*.c)
@@ -18,7 +17,7 @@ OBJ := $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRC))
 DEP := $(OBJ:.o=.d)
 
 CC ?= gcc
-CFLAGS := -std=c23 -I$(INC_DIR) -Wall -Wextra -MMD -MP
+CFLAGS := -std=c23 -Wall -Wextra -MMD -MP
 
 LIB_DIR := ./lib
 

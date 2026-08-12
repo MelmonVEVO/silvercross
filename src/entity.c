@@ -1,8 +1,10 @@
 #include "entity.h"
+#include "assets.h"
 #include "bullet.h"
 #include "constants.h"
 #include "enemy.h"
 #include "medal.h"
+#include "particle.h"
 #include "player.h"
 #include "raylib.h"
 #include "utils.h"
@@ -431,8 +433,23 @@ void move_entity(Entity *entity, f32 delta) {
     move(&entity->position, entity->velocity, delta);
 }
 
-u32 cancel_bullets(bool spawn_crystals,
-                   [[maybe_unused]] bool spawn_the_particle) {
+static const ParticleConfig CANCELLED_BULLET_PARTICLE = (ParticleConfig){
+    .static_texture_atlas = &assets.textures.star,
+    .static_texture_rows = 1,
+    .static_texture_columns = 1,
+    .static_texture_pick_to = 0,
+    .static_texture_pick_from = 0,
+    .initial_scale = 1.0f,
+    .end_scale = 0.2f,
+    .initial_texture_rotational_randomness = 360.0f,
+    .texture_rotation_speed = 50.0f,
+    /* .texture_rotation_speed_randomness = 50.0f, */
+    .base_lifetime = 0.5f,
+    .lifetime_randomness_seconds = 0.2f,
+    .flags = PARTICLEFLAG_HIGH_DRAW_PRIORITY,
+};
+
+u32 cancel_bullets(bool spawn_crystals, bool spawn_the_particle) {
     Entity *current;
     u32 count = 0;
     for (i32 i = 0; i < MAX_ENTITIES; i++) {
@@ -441,12 +458,15 @@ u32 cancel_bullets(bool spawn_crystals,
         if (!(current->type == ENTITY_BULLET))
             continue;
 
+        if (spawn_the_particle) {
+            spawn_particle(&CANCELLED_BULLET_PARTICLE, current->position,
+                           current->velocity, WHITE);
+        }
         destroy_entity_ptr(current);
         if (spawn_crystals) {
             Entity *medal = spawn_entity(ENTITY_MEDAL);
             medal->position = position;
         }
-        // TODO: particle
         count++;
     }
     return count;

@@ -41,6 +41,7 @@ typedef struct BulletConfig {
 } BulletConfig;
 
 typedef struct {
+    f32 value;
     bool is_following_player;
 } MedalData;
 
