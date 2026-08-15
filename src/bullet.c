@@ -26,8 +26,15 @@ static const ParticleConfig CANCELLED_BULLET_PARTICLE = (ParticleConfig){
 
 void process_bullet(Entity *self, f32 delta) {
     move(&self->position, self->velocity, delta);
-    accelerate(&self->velocity, self->as.bullet.acceleration, delta);
+    accelerate(&self->velocity, self->as.bullet.config.acceleration,
+               delta);
     move(&self->velocity, self->as.bullet.config.gravity, delta);
+    if (self->as.bullet.config.min_speed != 0 &&
+        check_magnitudes_lower(self->velocity,
+                               self->as.bullet.config.min_speed)) {
+        self->velocity = Vector2Scale(Vector2Normalize(self->velocity),
+                                      self->as.bullet.config.min_speed);
+    }
 
     self->velocity = Vector2Rotate(
         self->velocity,
@@ -60,6 +67,7 @@ static void fire(Vector2 initial_position, f32 direction,
     if (!config)
         log_error("Config not passed in to spawn a bullet!");
     Entity *bullet = spawn_entity(ENTITY_BULLET);
+    assert(bullet);
     if (!bullet) {
         log_warning("Exhausted pool while trying to spawn a bullet.");
         return;
@@ -94,8 +102,8 @@ static const ParticleConfig player_bullet_impact_particle =
 static const ParticleConfig player_bullet_impact_small_particle =
     (ParticleConfig){
         .flags = PARTICLEFLAG_HIGH_DRAW_PRIORITY,
-        .base_lifetime = 0.3f,
-        .lifetime_randomness_seconds = 0.3f,
+        .base_lifetime = 0.2f,
+        .lifetime_randomness_seconds = 0.1f,
         .initial_scale = 1.0f,
     };
 
@@ -114,13 +122,13 @@ void hit_bullet(Entity *self, Entity *other) {
         spawn_particle(&player_bullet_impact_particle, particle_position,
                        Vector2Zero(), WHITE);
         burst_particles(&player_bullet_impact_small_particle,
-                        particle_position, 70.0f, 0, 360.0f, 40, 32.0f,
-                        10.0f, Fade(WHITE, 0.4f));
+                        particle_position, 90.0f, 0, 360.0f, 40, 32.0f,
+                        10.0f, Fade(WHITE, 0.6f));
     } else if (other->type == ENTITY_BOMB) {
         spawn_particle(&CANCELLED_BULLET_PARTICLE, self->position,
                        self->velocity, WHITE);
     }
-    destroy_entity_ptr(self);
+    self->queue_destroy = true;
 }
 
 static Vector2 get_bullet_start_position(Vector2 origin, float offset,

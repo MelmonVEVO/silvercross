@@ -1,5 +1,6 @@
 #include "entity.h"
 #include "assets.h"
+#include "bomb.h"
 #include "bullet.h"
 #include "constants.h"
 #include "enemy.h"
@@ -9,6 +10,7 @@
 #include "raylib.h"
 #include "utils.h"
 #include <assert.h>
+#include <raymath.h>
 #include <stddef.h>
 
 #ifdef DEBUG
@@ -61,6 +63,14 @@ const EntityBehaviours entity_behaviours[ENTITY_TYPE_COUNT] = {
             .die = die_enemy,
             .hit = hit_enemy,
             .damage = damage_enemy,
+        },
+    [ENTITY_BOMB] =
+        {
+            .process = process_bomb,
+            .draw = draw_bomb,
+            .init = init_bomb,
+            .die = entity_die_noop,
+            .damage = entity_damage_noop,
         },
 };
 
@@ -134,7 +144,7 @@ static inline bool is_valid_collision(EntityType a, EntityType b) {
         return b_nrm == ENTITY_BULLET || b_nrm == ENTITY_ENEMY ||
                b_nrm == ENTITY_MEDAL;
     case ENTITY_BULLET:
-        return b_nrm == ENTITY_ENEMY;
+        return b_nrm == ENTITY_ENEMY || b_nrm == ENTITY_BOMB;
     case ENTITY_ENEMY:
         return b_nrm == ENTITY_BOMB;
     default:
@@ -220,7 +230,11 @@ void resolve_other(void) {
     for (i32 i = 0; i < MAX_ENTITIES; i++) {
         current = &entities.entities[i];
         if (current->hp <= 0 && current->is_alive) {
+            current->is_alive = false;
             entity_die(current);
+        }
+        if (current->queue_destroy) {
+            destroy_entity_ptr(current);
         }
     }
 }
@@ -239,8 +253,9 @@ void update_partition_grid(void) {
             continue;
 
         i32 xstart, xend, ystart, yend;
+        Vector2 current_position = get_entity_world_position(current);
         Rectangle entity_bounds = create_centred_rectangle(
-            current->position.x, current->position.y, current->collision);
+            current_position.x, current_position.y, current->collision);
         collision_rects[i] = entity_bounds;
         if (test_rectangle_offscreen(entity_bounds))
             continue;
@@ -383,23 +398,6 @@ void reset_entities(void) {
 }
 
 void draw_entities(f32 delta) {
-#ifdef PARTITION_DISPLAY
-    const Color aqua = {0, 255, 255, 255};
-    const i32 cell_size = SPATIAL_PARTITION_CELL_SIZE;
-
-    for (i32 y = 0; y < PARTITION_GRID_HEIGHT; y++) {
-        for (i32 x = 0; x < PARTITION_GRID_WIDTH; x++) {
-            PartitionCell *cell = &partition_grid.cells[y][x];
-
-            DrawRectangle(x * cell_size, y * cell_size, cell_size - 1,
-                          cell_size - 1, BLUE);
-            DrawTextEx(assets.fonts.fusion, TextFormat("%d", cell->count),
-                       (Vector2){(x * cell_size) + 2, (y * cell_size) + 2},
-                       assets.fonts.fusion.baseSize, 0, BLACK);
-        }
-    }
-#endif
-
     Entity *current;
     for (i32 i = 0; i < MAX_ENTITIES; i++) {
         current = &entities.entities[i];
@@ -455,7 +453,8 @@ u32 cancel_bullets(bool spawn_crystals, bool spawn_the_particle) {
     for (i32 i = 0; i < MAX_ENTITIES; i++) {
         current = &entities.entities[i];
         Vector2 position = current->position;
-        if (!(current->type == ENTITY_BULLET))
+        if (!(current->type == ENTITY_BULLET) ||
+            (current->as.bullet.config.flags & BULLETFLAG_PLAYER))
             continue;
 
         if (spawn_the_particle) {
@@ -465,6 +464,11 @@ u32 cancel_bullets(bool spawn_crystals, bool spawn_the_particle) {
         destroy_entity_ptr(current);
         if (spawn_crystals) {
             Entity *medal = spawn_entity(ENTITY_MEDAL);
+            assert(medal);
+            if (!medal) {
+                log_warning("Could not spawn medal!");
+                continue;
+            }
             medal->position = position;
         }
         count++;
@@ -472,7 +476,7 @@ u32 cancel_bullets(bool spawn_crystals, bool spawn_the_particle) {
     return count;
 }
 
-Vector2 entity_world_position(Entity *entity) {
+Vector2 get_entity_world_position(Entity *entity) {
     EntityHandle parent = entity->parent;
     if (!is_handle_valid(parent))
         return entity->position;
@@ -481,6 +485,19 @@ Vector2 entity_world_position(Entity *entity) {
         entity->parent = ENTITY_HANDLE_NONE;
         return entity->position;
     }
-    return Vector2Add(entity_world_position(parent_entity),
+    return Vector2Add(get_entity_world_position(parent_entity),
                       entity->position);
+}
+
+void add_child(Entity *parent_entity, Entity *child_entity) {
+    if (!parent_entity || !child_entity) {
+        log_warning(
+            "Tried to add a child to a parent when either did not exist.");
+        return;
+    }
+    child_entity->position =
+        Vector2Subtract(get_entity_world_position(child_entity),
+                        get_entity_world_position(parent_entity));
+    EntityHandle parent_handle = entity_handle_from_ptr(parent_entity);
+    child_entity->parent = parent_handle;
 }

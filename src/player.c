@@ -5,6 +5,7 @@
 #include "entity.h"
 #include "medal.h"
 #include "utils.h"
+#include <assert.h>
 #include <float.h>
 #include <raylib.h>
 #include <raymath.h>
@@ -20,13 +21,13 @@ static BulletConfig player_bullet_args = (BulletConfig){
 };
 
 const Vector2 options_locs[4] = {
-    (Vector2){-25.0f, 10.0f},
-    (Vector2){-40.0f, 18.0f},
-    (Vector2){25.0f, 10.0f},
-    (Vector2){40.0f, 18.0f},
+    (Vector2){-20.0f, 21.0f},
+    (Vector2){-30.0f, 13.0f},
+    (Vector2){20.0f, 21.0f},
+    (Vector2){30.0f, 13.0f},
 };
 
-Vector2 player_position(void) {
+const Vector2 player_position(void) {
     Entity *player = get_entity(player_ref, ENTITY_PLAYER);
     return player->position;
 }
@@ -42,16 +43,16 @@ static void player_fire(Entity *player, f32 delta) {
             -90.0f, &player_bullet_args, 0);
         bullet_fire_one(Vector2Add(player->as.player.options_position,
                                    options_locs[0]),
-                        -95.0f, &player_bullet_args, 0);
+                        -92.0f, &player_bullet_args, 0);
         bullet_fire_one(Vector2Add(player->as.player.options_position,
                                    options_locs[1]),
-                        -100.0f, &player_bullet_args, 0);
+                        -95.0f, &player_bullet_args, 0);
         bullet_fire_one(Vector2Add(player->as.player.options_position,
                                    options_locs[2]),
-                        -85.0f, &player_bullet_args, 0);
+                        -88.0f, &player_bullet_args, 0);
         bullet_fire_one(Vector2Add(player->as.player.options_position,
                                    options_locs[3]),
-                        -80.0f, &player_bullet_args, 0);
+                        -85.0f, &player_bullet_args, 0);
         fire_rate = PLAYER_FIRE_RATE;
     }
     fire_rate -= delta;
@@ -66,6 +67,8 @@ static void fully_kill_player(Entity *self) {
     /*     VEC2FROMANGLE(2 * PI * random_float(), PLAYER_DEATH_YEET_SPEED);
      */
     player_data->life -= 1;
+    player_data->bomber_stock =
+        MIN(MAX_BOMBS, player_data->bomber_stock + 1);
     cancel_bullets(false, true);
     set_medal_chain_gauge_0();
     // play death sound
@@ -103,7 +106,11 @@ void process_player(Entity *player, f32 delta) {
         player->velocity.y += 1.0f;
 
     f32 speed;
-    if (IsKeyDown(KEY_LEFT_SHIFT))
+
+    Entity *bomber_entity = get_entity(data->bomber_entity, ENTITY_BOMB);
+    if (bomber_entity)
+        speed = PLAYER_BOMB_SPEED;
+    else if (IsKeyDown(KEY_LEFT_SHIFT))
         speed = PLAYER_FOCUS_SPEED;
     else
         speed = PLAYER_SPEED;
@@ -124,7 +131,7 @@ void process_player(Entity *player, f32 delta) {
               PLAYER_MOVEMENT_BOUNDS_UNITS,
               VIEWPORT_HEIGHT - PLAYER_MOVEMENT_BOUNDS_UNITS);
 
-    if (IsKeyDown(KEY_Z))
+    if (IsKeyDown(KEY_Z) && !(data->is_charging_bomb || bomber_entity))
         player_fire(player, delta);
 
     if (Vector2Length(data->additional_velocity) <= 15.0f) {
@@ -133,6 +140,32 @@ void process_player(Entity *player, f32 delta) {
 
     data->additional_velocity = Vector2Lerp(data->additional_velocity,
                                             Vector2Zero(), 15.0f * delta);
+
+    if (IsKeyPressed(KEY_X) && data->bomber_stock > 0 && !bomber_entity &&
+        !data->is_charging_bomb) {
+        data->is_charging_bomb = true;
+        data->counterbomb_active = false;
+        data->invincibility_time = PLAYER_INVINCIBILITY_TIME;
+        data->bomber_charge_time = PLAYER_BOMBER_CHARGE_TIME;
+        data->bomber_stock--;
+    }
+
+    if (data->is_charging_bomb) {
+        data->bomber_charge_time -= delta;
+        if (data->bomber_charge_time <= 0) {
+            data->is_charging_bomb = false;
+            Entity *bomber = spawn_entity(ENTITY_BOMB);
+            assert(bomber);
+            if (!bomber) {
+                log_warning("Could not spawn bomber entity!");
+                return;
+            }
+            data->bomber_entity = entity_handle_from_ptr(bomber);
+            add_child(player, bomber);
+            bomber->position =
+                (Vector2){0, (VIEWPORT_HEIGHT / 2.0f) - VIEWPORT_HEIGHT};
+        }
+    }
 }
 
 void draw_player(Entity *player, f32 delta) {
@@ -140,6 +173,20 @@ void draw_player(Entity *player, f32 delta) {
 
     if (player->as.player.life == 0)
         return;
+
+    if (get_entity(player->as.player.bomber_entity, ENTITY_BOMB) ||
+        player->as.player.is_charging_bomb) {
+        f32 scale =
+            player->as.player.is_charging_bomb
+                ? quint_ease((PLAYER_BOMBER_CHARGE_TIME -
+                              player->as.player.bomber_charge_time) /
+                             PLAYER_BOMBER_CHARGE_TIME)
+                : 1.0f;
+        draw_centred_texture_ex(
+            assets.textures.bomb_circle,
+            Vector2Add(player->position, (Vector2){0, -32.0f}), 0, scale,
+            WHITE);
+    }
 
     f32 invincibility_time = player->as.player.invincibility_time;
     f32 invincibility_opacity =
@@ -209,8 +256,6 @@ static void kill_player(Entity *self) {
 static void bonk_player(Entity *self, const Vector2 other_position,
                         const bool lethal) {
     PlayerData *data = &self->as.player;
-    log_info("%.05f %.05f", data->invincibility_time,
-             data->collision_recovery_time);
     if (data->invincibility_time > 0 || data->collision_recovery_time > 0)
         return;
     f32 angle = DEG2RAD * front_towards_player(other_position);
@@ -255,7 +300,7 @@ void hit_player(Entity *self, Entity *other) {
     }
 }
 
-f32 front_towards_player(Vector2 position) {
+const f32 front_towards_player(Vector2 position) {
     return front_towards_whatever(
         position, get_entity(player_ref, ENTITY_PLAYER)->position);
 }
@@ -266,4 +311,18 @@ u8 get_player_life(void) {
 
 u8 get_player_bombs(void) {
     return get_entity(player_ref, ENTITY_PLAYER)->as.player.bomber_stock;
+}
+
+const f32 get_player_attract_circle_radius(void) {
+    PlayerData *data = &get_entity(player_ref, ENTITY_PLAYER)->as.player;
+    Entity *bomber_entity = get_entity(data->bomber_entity, ENTITY_BOMB);
+    return (!IsKeyDown(KEY_Z) || data->is_charging_bomb || bomber_entity
+                ? ATTRACT_CIRCLE_RADIUS_LARGE
+                : ATTRACT_CIRCLE_RADIUS);
+}
+
+f32 get_player_bomb_progress(void) {
+    PlayerData *data = &get_entity(player_ref, ENTITY_PLAYER)->as.player;
+    return (MEDALS_FOR_NEW_BOMB - (f32)data->medals_until_next_bomber) /
+           MEDALS_FOR_NEW_BOMB;
 }

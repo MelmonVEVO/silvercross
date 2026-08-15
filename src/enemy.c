@@ -3,23 +3,30 @@
 #include "bullet.h"
 #include "constants.h"
 #include "entity.h"
+#include "game.h"
+#include "medal.h"
 #include "player.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "utils.h"
 #include <assert.h>
 
+f32 boss_timer = 0;
+
 // -- Luciko --
 
 BulletConfig luciko_pat1_spiral_bullet = (BulletConfig){
     .bullet_texture = &assets.textures.bullets1,
     .texture_row = 0,
-    .initial_speed = 90.0f,
-    .initial_ttl = 10.0f,
+    .initial_speed = 200.0f,
+    .min_speed = 80.0f,
+    .acceleration = -280.0f,
+    .initial_ttl = 5.0f,
 };
 
 PatternConfig luciko_pat1_spiral = (PatternConfig){
-    .pattern_type = BP_ONE,
+    .pattern_type = BP_RING,
+    .bullets_in_pattern = 2,
     .bullet_config = &luciko_pat1_spiral_bullet,
     .spawn_offset = 4.0f,
     .trajectory = TRJ_DEFAULT,
@@ -29,15 +36,17 @@ EmitterConfig luciko_pat1_spiral_emitter = (EmitterConfig){
     .number_of_volleys = -1,
     .pattern = &luciko_pat1_spiral,
     .rotation_range = 360.0f,
-    .rotation_speed = 100.0f,
+    .rotation_speed = 750.0f,
     .rotation_type = ROT_CONTINUOUS,
     .start_rotation = 90.0f,
-    .volley_rate = 24.0f,
+    .volley_rate = 70.0f,
     .time_until_start = 0.5f,
+    .enabled_by_default = true,
 };
 
 BulletConfig luciko_pat1_arc_bullet = (BulletConfig){
     .bullet_texture = &assets.textures.bullets1,
+    .flags = BULLETFLAG_BIG | BULLETFLAG_HIGH_PRIORITY,
     .texture_row = 1,
     .initial_speed = 130.0f,
     .initial_ttl = 5.0f,
@@ -48,13 +57,13 @@ PatternConfig luciko_pat1_arc = (PatternConfig){
     .bullet_config = &luciko_pat1_arc_bullet,
     .trajectory = TRJ_DEFAULT,
     .bullets_in_pattern = 7,
-    .pattern_length = 40.0f,
+    .pattern_length = 16.0f,
     .burst_data =
         {
             .number_of_shots = 3,
             .end_bullet_speed_modifier = 130.0f,
             .end_bullets_in_pattern = 7,
-            .total_time = 0.85f,
+            .total_time = 0.65f,
         },
     .flags = PATTERNFLAG_HAS_BURST,
 };
@@ -64,9 +73,191 @@ EmitterConfig luciko_pat1_arc_emitter = (EmitterConfig){
     .rotation_range = 360.0f,
     .rotation_type = ROT_TOWARDS_PLAYER,
     .number_of_volleys = -1,
-    .time_until_start = 0.5f,
-    .volley_rate = 0.3f,
+    .time_until_start = 0.83333f,
+    .volley_rate = 0.38f,
+    .enabled_by_default = true,
 };
+#define LUCIKO_HOME_POSITION (Vector2){VIEWPORT_WIDTH / 2.0f, 60.0f}
+#define LUCIKO_PHASE1_HP 900.0f
+#define LUCIKO_PHASE2_HP 780.0f
+#define LUCIKO_PHASE3_HP 780.0f
+#define LUCIKO_PHASE4_HP 780.0f
+#define LUCIKO_PHASE1_TIME 25
+#define LUCIKO_PHASE2_TIME 22
+#define LUCIKO_PHASE3_TIME 22
+#define LUCIKO_PHASE4_TIME 22
+
+static void enter_luciko_phase(Entity *self, LucikoPhase phase) {
+    set_medal_chain_boss_behaviour(true);
+    EmitterLive *emitters = self->as.enemy.current_emitters;
+    for (i32 i = 0; i < MAX_EMITTERS; i++) {
+        stop_emitter(&emitters[i]);
+    }
+    switch (phase) {
+    case LK_MOVE:
+        set_medal_chain_gauge_stop(true);
+        self->as.enemy.damage_modifier = 0;
+        break;
+    case LK_PATTERN1:
+        set_medal_chain_gauge_stop(false);
+        self->hp = LUCIKO_PHASE1_HP;
+        self->as.enemy.damage_modifier = 1.0f;
+        setup_emitter(&emitters[0], &luciko_pat1_spiral_emitter);
+        setup_emitter(&emitters[1], &luciko_pat1_arc_emitter);
+        self->time_alive = 0;
+        boss_timer = LUCIKO_PHASE1_TIME;
+        break;
+    case LK_PATTERN2:
+        set_medal_chain_gauge_stop(false);
+        self->hp = LUCIKO_PHASE2_HP;
+        self->as.enemy.damage_modifier = 1.0f;
+        self->time_alive = 0;
+        boss_timer = LUCIKO_PHASE2_TIME;
+        show_boss_hp_bar(entity_handle_from_ptr(self), LUCIKO_PHASE2_HP, 3,
+                         &boss_timer);
+        break;
+    case LK_PATTERN3:
+        set_medal_chain_gauge_stop(false);
+        self->hp = LUCIKO_PHASE3_HP;
+        self->as.enemy.damage_modifier = 1.0f;
+        self->time_alive = 0;
+        boss_timer = LUCIKO_PHASE3_TIME;
+        show_boss_hp_bar(entity_handle_from_ptr(self), LUCIKO_PHASE3_HP, 2,
+                         &boss_timer);
+        break;
+    case LK_PATTERN4:
+        set_medal_chain_gauge_stop(false);
+        self->hp = LUCIKO_PHASE4_HP;
+        self->as.enemy.damage_modifier = 1.0f;
+        self->time_alive = 0;
+        boss_timer = LUCIKO_PHASE4_TIME;
+        show_boss_hp_bar(entity_handle_from_ptr(self), LUCIKO_PHASE4_HP, 1,
+                         &boss_timer);
+        break;
+    case LK_DYING:
+        self->collision = Vector2Zero();
+        self->as.enemy.damage_modifier = 0;
+        hide_boss_hp_bar();
+        set_medal_chain_gauge_stop(true);
+        set_medal_chain_boss_behaviour(false);
+        break;
+    default:
+        log_error("Unknown Luciko pattern.");
+    }
+    self->as.enemy.luciko_data.phase = phase;
+}
+
+void init_luciko(Entity *self) {
+    assert(self->as.enemy.enemy_type == ENEMY_LUCIKO);
+    self->hp = LUCIKO_PHASE1_HP;
+    set_medal_chain_gauge_stop(true);
+    set_medal_chain_boss_behaviour(true);
+    self->collision = (Vector2){30.0f, 48.0f};
+    EnemyData *data = &self->as.enemy;
+    data->luciko_data.phase = LK_MOVE;
+    data->luciko_data.move_location = LUCIKO_HOME_POSITION;
+    data->luciko_data.switch_to = LK_PATTERN1;
+    data->damage_modifier = 0;
+    show_boss_hp_bar(entity_handle_from_ptr(self), LUCIKO_PHASE1_HP, 4,
+                     &boss_timer);
+}
+
+static void proceed_luciko(Entity *self) {
+    EnemyData *data = &self->as.enemy;
+    if (data->luciko_data.phase == LK_PATTERN4) {
+        enter_luciko_phase(self, LK_DYING);
+        return;
+    }
+    data->luciko_data.move_location = LUCIKO_HOME_POSITION;
+    LucikoPhase previous_phase = data->luciko_data.phase;
+    data->luciko_data.switch_to = previous_phase + 1;
+    enter_luciko_phase(self, LK_MOVE);
+}
+
+void die_luciko(Entity *self) {
+    self->hp = 0.0001f;
+    EnemyData *data = &self->as.enemy;
+    if (data->luciko_data.phase != LK_MOVE) {
+        cancel_bullets(true, false);
+    }
+    proceed_luciko(self);
+}
+
+static f32 funny_fourier(f32 t) {
+    return 120.0f +
+           70.0f * (((4.0f / PI) * sinf(2 * PI * t)) +
+                    ((4.0f / PI) * (1 / 3.0f) * sinf(6 * PI * t)));
+}
+
+void process_luciko(Entity *self, f32 delta) {
+    EnemyData *data = &self->as.enemy;
+    switch (data->luciko_data.phase) {
+    case LK_MOVE:
+        self->position = Vector2Lerp(
+            self->position, data->luciko_data.move_location, 6.0f * delta);
+        if (Vector2LengthSqr(Vector2Subtract(
+                data->luciko_data.move_location, self->position)) < 0.001f)
+            enter_luciko_phase(self, data->luciko_data.switch_to);
+        break;
+    case LK_PATTERN1:
+        self->position =
+            (Vector2){funny_fourier(self->time_alive * 0.15f),
+                      LUCIKO_HOME_POSITION.y +
+                          (sinf(self->time_alive * 2.4f) * 7.0f)};
+        break;
+    case LK_PATTERN2:
+        break;
+    case LK_PATTERN3:
+        break;
+    case LK_PATTERN4:
+        break;
+    case LK_DYING: // TODO: destroy luciko after dying animation
+        break;
+    default:
+        log_warning("Unknown Luciko pattern.");
+        assert(false);
+    }
+    if (get_player_life() == 0)
+        return;
+    if (data->luciko_data.phase != LK_MOVE &&
+        data->luciko_data.phase != LK_DYING) {
+        boss_timer -= delta;
+        if (boss_timer <= 0) {
+            boss_timer = 0;
+            cancel_bullets(false, true);
+            proceed_luciko(self);
+        }
+    }
+}
+
+// TODO: debug only, remove
+static char *phase_text(LucikoPhase phase) {
+    switch (phase) {
+    case LK_MOVE:
+        return "MOVE";
+    case LK_PATTERN1:
+        return "PATTERN1";
+    case LK_PATTERN2:
+        return "PATTERN2";
+    case LK_PATTERN3:
+        return "PATTERN3";
+    case LK_PATTERN4:
+        return "PATTERN4";
+    case LK_DYING:
+        return "DYING";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+void draw_luciko(Entity *self) {
+    DrawRectangle(self->position.x - 12, self->position.y - 24, 24, 48,
+                  RED);
+    draw_outlined_text_ex(
+        TextFormat("%s", phase_text(self->as.enemy.luciko_data.phase)),
+        assets.fonts.fusion, self->position, assets.fonts.fusion.baseSize,
+        0, WHITE, BLACK, 1);
+}
 
 // -- Test enemy --
 
@@ -120,7 +311,7 @@ void draw_test_enemy(Entity *self) {
 
 // Returns the position of an enemy's emitter in world space.
 static Vector2 emitter_world_pos(Entity *enemy, EmitterLive *emitter) {
-    return Vector2Add(entity_world_position(enemy),
+    return Vector2Add(get_entity_world_position(enemy),
                       emitter->config->local_position);
 }
 
@@ -299,12 +490,20 @@ static void process_emitters(Entity *enemy, float delta) {
 
 void spawn_enemy(EnemyType type, Vector2 at) {
     Entity *enemy = spawn_entity(ENTITY_ENEMY);
+    assert(enemy);
+    if (!enemy) {
+        log_warning("Could not spawn enemy!");
+        return;
+    }
     enemy->as.enemy = (EnemyData){};
     enemy->as.enemy.enemy_type = type;
+    enemy->as.enemy.damage_modifier = 1.0f;
     switch (type) {
     case ENEMY_TEST_ENEMY:
         init_test_enemy(enemy);
         break;
+    case ENEMY_LUCIKO:
+        init_luciko(enemy);
     default:
     }
     enemy->position = at;
@@ -325,11 +524,16 @@ void setup_emitter(EmitterLive *emitter, const EmitterConfig *config) {
     emitter->current_rotation = emitter->config->start_rotation;
 }
 
+void stop_emitter(EmitterLive *emitter) { emitter->enabled = false; }
+
 void process_enemy(Entity *self, f32 delta) {
     EnemyData *data = &self->as.enemy;
     switch (data->enemy_type) {
     case ENEMY_TEST_ENEMY:
         process_test_enemy(self, delta);
+        break;
+    case ENEMY_LUCIKO:
+        process_luciko(self, delta);
         break;
     default:
     }
@@ -345,6 +549,8 @@ void draw_enemy(Entity *self, f32 delta) {
     case ENEMY_TEST_ENEMY:
         draw_test_enemy(self);
         break;
+    case ENEMY_LUCIKO:
+        draw_luciko(self);
     default:
     }
     if (self->as.enemy.sealed)
@@ -353,14 +559,33 @@ void draw_enemy(Entity *self, f32 delta) {
 }
 
 void hit_enemy(Entity *self, Entity *other) {
-    if (other->type != ENTITY_BULLET ||
-        !(other->as.bullet.config.flags & BULLETFLAG_PLAYER))
-        return;
-    Entity *medal = spawn_entity(ENTITY_MEDAL);
-    medal->position = self->position;
-    entity_damage(self, PLAYER_BULLET_DAMAGE);
+    switch (other->type) {
+    case ENTITY_BULLET:
+        if (other->as.bullet.config.flags & BULLETFLAG_PLAYER)
+            entity_damage(self, PLAYER_BULLET_DAMAGE);
+        break;
+    case ENTITY_BOMB:
+        // sure, whatever. actually pass in the delta if things get weird
+        f32 delta = 1.0f / (f32)options.fps_option;
+        entity_damage(self, BOMB_DAMAGE * delta);
+        break;
+    default:
+    }
 }
 
-void die_enemy(Entity *self) {}
+void die_enemy(Entity *self) {
+    switch (self->as.enemy.enemy_type) {
+    case ENEMY_LUCIKO:
+        die_luciko(self);
+        break;
+    default:
+        // TODO: standard enemy explosion
+        self->queue_destroy = true;
+    }
+}
 
-void damage_enemy(Entity *self, f32 amount) {}
+void damage_enemy(Entity *self, f32 amount) {
+    self->hp -= amount * self->as.enemy.damage_modifier;
+    if (self->hp <= 0)
+        die_enemy(self);
+}

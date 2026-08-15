@@ -22,4 +22,7 @@ void load_assets(void) {
     assets.textures.playershot_impact =
         load_animated_texture("sprites/playerbullet_impact.png", 7, 1, 30);
     assets.textures.star = LoadTexture("sprites/bullet_star.png");
+    assets.textures.beam =
+        load_animated_texture("sprites/beam.png", 3, 1, 40);
+    assets.textures.bomb_circle = LoadTexture("sprites/bomb_circle.png");
 }

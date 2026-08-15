@@ -6,11 +6,14 @@
 #include "particle.h"
 #include "primitives.h"
 #include "utils.h"
-#include <dlfcn.h>
+#include <dlfcn.h> // TODO: implement hot reloading
 #include <math.h>
 #include <raylib.h>
 
 bool is_gameplay = true;
+
+// Eh, maybe.
+bool screenshake = false;
 
 void PROCESS(void) { process_game(); }
 
@@ -56,6 +59,11 @@ void DRAW(RenderTexture2D target) {
 
     vpdraw_y = floorf((GetScreenHeight() - vpheight_scaled) * 0.5f);
     vpdraw_x = floorf((GetScreenWidth() - vpwidth_scaled) * 0.5f);
+
+    if (screenshake) {
+        vpdraw_x += GetRandomValue(-1, 1);
+        vpdraw_y += GetRandomValue(-1, 1);
+    }
 
     // Shadow
     DrawRectanglePro((Rectangle){vpdraw_x + 10, vpdraw_y + 10,
@@ -104,14 +112,15 @@ i32 main(void) {
     HideCursor();
     ChangeDirectory("res");
     load_assets();
-    SetTargetFPS(FRAMERATE);
+    SetTargetFPS(options.fps_option);
 
     RenderTexture2D screen_target =
         LoadRenderTexture(VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
     SetTextureFilter(screen_target.texture, TEXTURE_FILTER_POINT);
 
     reset_game();
-    spawn_enemy(ENEMY_TEST_ENEMY, (Vector2){VIEWPORT_WIDTH / 2.0f, 60.0f});
+    spawn_enemy(ENEMY_LUCIKO,
+                (Vector2){VIEWPORT_WIDTH / 2.0f - 30.0f, -40.0f});
     initialise_particle_pool();
     while (!WindowShouldClose()) {
 #ifdef DEBUG

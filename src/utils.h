@@ -1,12 +1,3 @@
-/*
- * utils
- *
- * A pick-and-mix of useful utility functions and type
- * definitions, including maths, maths, linear algebra
- * and more maths!
- *
- * Copyright (c) 2026 MELMON PROJECT. All Rights Reserved.
- */
 #ifndef UTILS_H
 #define UTILS_H
 
@@ -92,15 +83,6 @@ void draw_outlined_text_ex(const char *text, Font font, Vector2 position,
                            f32 font_size, f32 spacing, Colour colour,
                            Colour outline_colour, i32 outline_size);
 
-// Draw text to the screen at position. Text will go to a new line if the
-// text's horizontal space would exceed max_width. Text will not break
-// words written in Latin characters. Japanese text may be broken.
-// Returns a Rectangle that represents the bounding box of the text.
-Rectangle draw_text_with_overflow(const char *text, Font font,
-                                  Vector2 position, f32 font_size,
-                                  f32 spacing, Colour colour,
-                                  f32 max_width, i32 newline_height);
-
 f32 random_float(void);
 
 void draw_centred_texture(Texture2D texture, Vector2 at);
@@ -179,7 +161,7 @@ static inline Vector2 vector_rejection(Vector2 a, Vector2 b) {
 
 void draw_cool_hexagon_thing(Vector2 at, Colour colour);
 
-static inline f32 qui32_ease(f32 x) {
+static inline f32 quint_ease(f32 x) {
     return Clamp(1 - powf(1 - x, 5), 0, 1.0f);
 }
 

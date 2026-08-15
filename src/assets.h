@@ -18,6 +18,8 @@ typedef struct {
         Texture2D hud;
         Texture2D seal;
         Texture2D star;
+        AnimatedTexture2D beam;
+        Texture2D bomb_circle;
     } textures;
     struct {
         Sound medal_collect;

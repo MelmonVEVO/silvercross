@@ -15,22 +15,33 @@ typedef enum {
     ENTITY_TYPE_COUNT,
 } EntityType;
 
+// In case you need to keep a reference to another
+// entity for more than one frame.
+typedef struct {
+    u32 idx;
+    u32 generation;
+} EntityHandle;
+
 typedef struct {
     Vector2 additional_velocity;
     Vector2 options_position;
     f32 invincibility_time;
     f32 hyper_gauge;
     f32 collision_recovery_time;
+    f32 bomber_charge_time;
+    EntityHandle bomber_entity;
     u8 life;
     u8 bomber_stock;
     u16 medals_until_next_bomber;
     bool hyper_active;
     bool counterbomb_active;
     u8 counterbomb_frames;
+    bool is_charging_bomb;
 } PlayerData;
 
 typedef struct BulletConfig {
     f32 initial_speed;
+    f32 min_speed;
     f32 acceleration;
     f32 angular_velocity;
     Vector2 gravity;
@@ -40,15 +51,20 @@ typedef struct BulletConfig {
     u8 texture_row;
 } BulletConfig;
 
+typedef enum {
+    MEDAL_SMALL,
+    MEDAL_MEDIUM,
+    MEDAL_LARGE,
+} MedalType;
+
 typedef struct {
-    f32 value;
+    MedalType type;
     bool is_following_player;
 } MedalData;
 
 typedef struct {
     BulletConfig config;
     f32 ttl;
-    f32 acceleration;
     AnimatedTexture2DInstance texture_instance;
 } BulletData;
 
@@ -63,6 +79,7 @@ typedef enum {
     TRJ_FIXED,
     TRJ_AIMED,
     TRJ_RANDOM,
+    TRJ_ALWAYS,
 } Trajectory;
 
 /*
@@ -99,7 +116,11 @@ typedef struct PatternConfig {
     f32 angle_randomisation;
 } PatternConfig;
 
-typedef enum { ENEMY_TEST_ENEMY, ENEMY_TYPE_COUNT } EnemyType;
+typedef enum {
+    ENEMY_TEST_ENEMY,
+    ENEMY_LUCIKO,
+    ENEMY_TYPE_COUNT
+} EnemyType;
 
 // RotationType controls how the emitter "rotates".
 typedef enum {
@@ -139,12 +160,36 @@ typedef struct {
     } burst;
 } EmitterLive;
 
+typedef enum {
+    LK_MOVE,
+    LK_PATTERN1,
+    LK_PATTERN2,
+    LK_PATTERN3,
+    LK_PATTERN4,
+    LK_DYING,
+} LucikoPhase;
+
+typedef enum {
+    ENEMY_DEATH_NORMAL,
+    ENEMY_DEATH_MIDBOSS,
+    ENEMY_DEATH_BOSS,
+} EnemyDeathType;
+
 typedef struct {
     EnemyType enemy_type;
     EmitterLive current_emitters[MAX_EMITTERS];
+    f32 damage_modifier;
     f32 seal_circle_radius;
     bool sealed;
-    union {};
+    EnemyDeathType death_type;
+    union {
+        struct {
+            LucikoPhase phase;
+            LucikoPhase switch_to;
+            Vector2 move_location;
+            f32 linger_time;
+        } luciko_data;
+    };
 } EnemyData;
 
 union EntityAs {
@@ -156,21 +201,17 @@ union EntityAs {
     } bomb;
 };
 
-// In case you need to keep a reference to another
-// entity for more than one frame.
 typedef struct {
-    u32 idx;
-    u64 generation;
-} EntityHandle;
-
-typedef struct {
-    EntityType type;
-    u64 generation;
-
+    u32 generation;
     f32 hp;
+    EntityType type;
     // Do not update this manually.
     bool is_active;
+    // If this is true and HP is 0, calls the die function.
     bool is_alive;
+    // Making this true destroys the entity after all collisions.
+    // Safer than calling destroy_entity directly.
+    bool queue_destroy;
     f32 time_alive;
     Vector2 position, velocity, collision;
     EntityHandle parent;
@@ -247,6 +288,7 @@ void process_entities(f32 delta);
 void draw_entities(f32 delta);
 u32 entity_count(void);
 u32 cancel_bullets(bool spawn_crystals, bool spawn_the_particle);
-Vector2 entity_world_position(Entity *entity);
+Vector2 get_entity_world_position(Entity *entity);
+void add_child(Entity *parent_entity, Entity *child_entity);
 
 #endif // ENTITY_H
