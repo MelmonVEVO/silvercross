@@ -225,6 +225,7 @@ void process_luciko(Entity *self, f32 delta) {
         if (boss_timer <= 0) {
             boss_timer = 0;
             cancel_bullets(false, true);
+            halve_medal_chain();
             proceed_luciko(self);
         }
     }

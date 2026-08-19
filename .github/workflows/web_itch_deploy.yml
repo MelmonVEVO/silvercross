@@ -38,5 +38,5 @@ jobs:
         env:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
         run: |
-          butler push magicalshoot.zip Melmon/magical-shoot:html5 \
+          butler push magicalshoot.zip Melmon/silvercross:html5 \
           --userversion "${GITHUB_REF_NAME}-${GITHUB_SHA::7}"

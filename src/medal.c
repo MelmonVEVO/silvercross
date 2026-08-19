@@ -117,3 +117,5 @@ void set_medal_chain_boss_behaviour(bool is_boss) {
 void set_medal_chain_gauge_0(void) { medals_state.chain_gauge = 0; }
 
 void reset_medals_state(void) { medals_state = (MedalsState){}; }
+
+void halve_medal_chain(void) { medals_state.chain *= 0.5f; }

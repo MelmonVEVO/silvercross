@@ -21,6 +21,7 @@ void set_medal_chain_boss_behaviour(bool is_boss);
 void process_medals_state(f32 delta);
 const MedalsState get_current_medals_state(void);
 void reset_medals_state(void);
+void halve_medal_chain(void);
 
 void process_medal(Entity *self, f32 delta);
 void draw_medal(Entity *self, f32 delta);
