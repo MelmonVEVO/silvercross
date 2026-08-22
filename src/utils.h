@@ -17,6 +17,7 @@
 // Uses radians.
 #define VEC2FROMANGLE(angle, magnitude)                                   \
     Vector2Scale((Vector2){cosf(angle), sinf(angle)}, magnitude)
+#define SIGNUM(x) ((x) >= 0 ? 1.0f : -1.0f)
 
 typedef Color Colour; // ;)
 
@@ -55,8 +56,8 @@ AnimatedTexture2D load_animated_texture(const char *filepath,
 void unload_animated_texture(AnimatedTexture2D *animated_texture);
 
 // Applies linear acceleration to a velocity.
-void accelerate(Vector2 *velocity, const f32 acceleration,
-                const f32 delta);
+void accelerate(Vector2 *velocity, Vector2 positive_direction,
+                const float acceleration, const float delta);
 
 // Updates a position vector based on velocity (could also be used for
 // applying a vector acceleration to a velocity).
@@ -197,5 +198,26 @@ static inline f32 smoothstep(const f32 edge0, const f32 edge1,
     return (3.0f * reduced_x * reduced_x) -
            (2.0f * reduced_x * reduced_x * reduced_x);
 }
+
+static inline f32 smootherstep(const f32 edge0, const f32 edge1,
+                               const f32 x) {
+    f32 rx = Clamp((x - edge0) / (edge1 - edge0), 0, 1.0f);
+    return ((6.0f * rx * rx * rx * rx * rx) - (15.0f * rx * rx * rx * rx) +
+            (10.0f * rx * rx * rx));
+}
+
+typedef enum {
+    INPUT_SHOT,
+    INPUT_BOMB,
+    INPUT_SLOW,
+    INPUT_PAUSE,
+    INPUT_LEFT,
+    INPUT_RIGHT,
+    INPUT_UP,
+    INPUT_DOWN,
+} GameInput;
+
+bool is_input_down(GameInput input);
+bool is_input_just_pressed(GameInput input);
 
 #endif // UTILS_H

@@ -11,13 +11,11 @@
 #include <stdio.h>
 #include <unistd.h>
 
-void accelerate(Vector2 *velocity, const float acceleration,
-                const float delta) {
-    if (Vector2LengthSqr(*velocity) == 0.0f)
-        return;
-    *velocity =
-        Vector2Add(*velocity, Vector2Scale(Vector2Normalize(*velocity),
-                                           acceleration * delta));
+void accelerate(Vector2 *velocity, Vector2 positive_direction,
+                const float acceleration, const float delta) {
+    f32 speed = Vector2DotProduct(*velocity, positive_direction);
+    speed += acceleration * delta;
+    *velocity = Vector2Scale(positive_direction, speed);
 }
 
 void move(Vector2 *position, const Vector2 velocity, float delta) {
@@ -253,4 +251,59 @@ bool test_rectangle_offscreen(Rectangle rect) {
 
 f32 random_float(void) {
     return (float)GetRandomValue(0, INT_MAX) / (float)INT_MAX;
+}
+
+static int get_kb_input(GameInput input) {
+    switch (input) {
+    case INPUT_SHOT:
+        return KEY_Z;
+    case INPUT_BOMB:
+        return KEY_X;
+    case INPUT_SLOW:
+        return KEY_LEFT_SHIFT;
+    case INPUT_PAUSE:
+        return KEY_ESCAPE;
+    case INPUT_LEFT:
+        return KEY_LEFT;
+    case INPUT_RIGHT:
+        return KEY_RIGHT;
+    case INPUT_UP:
+        return KEY_UP;
+    case INPUT_DOWN:
+        return KEY_DOWN;
+    default:
+        return KEY_NULL;
+    }
+}
+
+static int get_gamepad_input(GameInput input) {
+    switch (input) {
+    case INPUT_SHOT:
+        return GAMEPAD_BUTTON_RIGHT_FACE_DOWN;
+    case INPUT_BOMB:
+        return GAMEPAD_BUTTON_RIGHT_FACE_RIGHT;
+    case INPUT_SLOW:
+        return GAMEPAD_BUTTON_RIGHT_TRIGGER_2;
+    case INPUT_PAUSE:
+        return GAMEPAD_BUTTON_MIDDLE_RIGHT;
+    case INPUT_LEFT:
+        return GAMEPAD_BUTTON_LEFT_FACE_LEFT;
+    case INPUT_RIGHT:
+        return GAMEPAD_BUTTON_LEFT_FACE_RIGHT;
+    case INPUT_UP:
+        return GAMEPAD_BUTTON_LEFT_FACE_UP;
+    case INPUT_DOWN:
+        return GAMEPAD_BUTTON_LEFT_FACE_DOWN;
+    default:
+        return GAMEPAD_BUTTON_UNKNOWN;
+    }
+}
+
+bool is_input_down(GameInput input) {
+    return IsKeyDown(get_kb_input(input)) ||
+           IsGamepadButtonDown(0, get_gamepad_input(input));
+}
+bool is_input_just_pressed(GameInput input) {
+    return IsKeyPressed(get_kb_input(input)) ||
+           IsGamepadButtonPressed(0, get_gamepad_input(input));
 }

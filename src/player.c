@@ -27,7 +27,7 @@ const Vector2 options_locs[4] = {
     (Vector2){30.0f, 13.0f},
 };
 
-const Vector2 player_position(void) {
+Vector2 player_position(void) {
     Entity *player = get_entity(player_ref, ENTITY_PLAYER);
     return player->position;
 }
@@ -37,22 +37,22 @@ static void player_fire(Entity *player, f32 delta) {
     if (fire_rate <= 0) {
         bullet_fire_one(
             (Vector2){player->position.x - 7.0f, player->position.y},
-            -90.0f, &player_bullet_args, 0);
+            -90.0f, &player_bullet_args, 0, 0);
         bullet_fire_one(
             (Vector2){player->position.x + 7.0f, player->position.y},
-            -90.0f, &player_bullet_args, 0);
+            -90.0f, &player_bullet_args, 0, 0);
         bullet_fire_one(Vector2Add(player->as.player.options_position,
                                    options_locs[0]),
-                        -92.0f, &player_bullet_args, 0);
+                        -92.0f, &player_bullet_args, 0, 0);
         bullet_fire_one(Vector2Add(player->as.player.options_position,
                                    options_locs[1]),
-                        -95.0f, &player_bullet_args, 0);
+                        -95.0f, &player_bullet_args, 0, 0);
         bullet_fire_one(Vector2Add(player->as.player.options_position,
                                    options_locs[2]),
-                        -88.0f, &player_bullet_args, 0);
+                        -88.0f, &player_bullet_args, 0, 0);
         bullet_fire_one(Vector2Add(player->as.player.options_position,
                                    options_locs[3]),
-                        -85.0f, &player_bullet_args, 0);
+                        -85.0f, &player_bullet_args, 0, 0);
         fire_rate = PLAYER_FIRE_RATE;
     }
     fire_rate -= delta;
@@ -96,13 +96,13 @@ void process_player(Entity *player, f32 delta) {
     }
 
     player->velocity = Vector2Zero();
-    if (IsKeyDown(KEY_LEFT))
+    if (is_input_down(INPUT_LEFT))
         player->velocity.x -= 1.0f;
-    if (IsKeyDown(KEY_RIGHT))
+    if (is_input_down(INPUT_RIGHT))
         player->velocity.x += 1.0f;
-    if (IsKeyDown(KEY_UP))
+    if (is_input_down(INPUT_UP))
         player->velocity.y -= 1.0f;
-    if (IsKeyDown(KEY_DOWN))
+    if (is_input_down(INPUT_DOWN))
         player->velocity.y += 1.0f;
 
     f32 speed;
@@ -110,7 +110,7 @@ void process_player(Entity *player, f32 delta) {
     Entity *bomber_entity = get_entity(data->bomber_entity, ENTITY_BOMB);
     if (bomber_entity)
         speed = PLAYER_BOMB_SPEED;
-    else if (IsKeyDown(KEY_LEFT_SHIFT))
+    else if (is_input_down(INPUT_SLOW))
         speed = PLAYER_FOCUS_SPEED;
     else
         speed = PLAYER_SPEED;
@@ -131,7 +131,18 @@ void process_player(Entity *player, f32 delta) {
               PLAYER_MOVEMENT_BOUNDS_UNITS,
               VIEWPORT_HEIGHT - PLAYER_MOVEMENT_BOUNDS_UNITS);
 
-    if (IsKeyDown(KEY_Z) && !(data->is_charging_bomb || bomber_entity))
+    if (is_input_just_pressed(INPUT_SHOT))
+        data->fire_time = PLAYER_TAP_FIRE_TIME;
+
+    data->fire_time -= delta;
+
+    if (is_input_down(INPUT_SHOT) && data->fire_time <= 0)
+        data->fire_time = EPSILON;
+
+    if (data->is_charging_bomb || bomber_entity)
+        data->fire_time = 0;
+
+    if (data->fire_time > 0)
         player_fire(player, delta);
 
     if (Vector2Length(data->additional_velocity) <= 15.0f) {
@@ -141,8 +152,8 @@ void process_player(Entity *player, f32 delta) {
     data->additional_velocity = Vector2Lerp(data->additional_velocity,
                                             Vector2Zero(), 15.0f * delta);
 
-    if (IsKeyPressed(KEY_X) && data->bomber_stock > 0 && !bomber_entity &&
-        !data->is_charging_bomb) {
+    if (is_input_just_pressed(INPUT_BOMB) && data->bomber_stock > 0 &&
+        !bomber_entity && !data->is_charging_bomb) {
         data->is_charging_bomb = true;
         data->counterbomb_active = false;
         data->invincibility_time = PLAYER_INVINCIBILITY_TIME;
@@ -300,7 +311,7 @@ void hit_player(Entity *self, Entity *other) {
     }
 }
 
-const f32 front_towards_player(Vector2 position) {
+f32 front_towards_player(Vector2 position) {
     return front_towards_whatever(
         position, get_entity(player_ref, ENTITY_PLAYER)->position);
 }
@@ -313,10 +324,11 @@ u8 get_player_bombs(void) {
     return get_entity(player_ref, ENTITY_PLAYER)->as.player.bomber_stock;
 }
 
-const f32 get_player_attract_circle_radius(void) {
+f32 get_player_attract_circle_radius(void) {
     PlayerData *data = &get_entity(player_ref, ENTITY_PLAYER)->as.player;
     Entity *bomber_entity = get_entity(data->bomber_entity, ENTITY_BOMB);
-    return (!IsKeyDown(KEY_Z) || data->is_charging_bomb || bomber_entity
+    return (!is_input_down(INPUT_SHOT) || data->is_charging_bomb ||
+                    bomber_entity
                 ? ATTRACT_CIRCLE_RADIUS_LARGE
                 : ATTRACT_CIRCLE_RADIUS);
 }

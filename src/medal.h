@@ -27,5 +27,6 @@ void process_medal(Entity *self, f32 delta);
 void draw_medal(Entity *self, f32 delta);
 void init_medal(Entity *self);
 void hit_medal(Entity *self, Entity *other);
+void spawn_medals(Vector2 position, u32 count);
 
 #endif // MEDAL_H

@@ -107,8 +107,11 @@ void process_particles(float delta) {
         particle->velocity = Vector2Rotate(
             particle->velocity,
             particle->current_angular_velocity * DEG2RAD * delta);
-        accelerate(&particle->velocity, configuration->linear_acceleration,
-                   delta);
+        accelerate(&particle->velocity,
+                   Vector2Normalize(particle->velocity),
+                   configuration->linear_acceleration,
+                   delta); // NOTE: update with actual positive direction
+                           // if we need negative accelerations
         move(&particle->velocity, configuration->gravity, delta);
         move(&particle->position, particle->velocity, delta);
         particle->texture_rotation +=

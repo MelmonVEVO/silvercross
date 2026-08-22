@@ -119,3 +119,15 @@ void set_medal_chain_gauge_0(void) { medals_state.chain_gauge = 0; }
 void reset_medals_state(void) { medals_state = (MedalsState){}; }
 
 void halve_medal_chain(void) { medals_state.chain *= 0.5f; }
+
+void spawn_medals(Vector2 position, u32 count) {
+    for (u32 i = 0; i < count; i++) {
+        Entity *medal = spawn_entity(ENTITY_MEDAL);
+        assert(medal);
+        if (!medal) {
+            log_warning("Could not spawn medal!");
+            continue;
+        }
+        medal->position = position;
+    }
+}

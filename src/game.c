@@ -12,7 +12,7 @@
 #include <raylib.h>
 
 Options options = {
-    .fps_option = FPS_60,
+    .fps_option = FPS_120,
     .difficulty = DIFFICULTY_HARD,
 };
 
@@ -233,7 +233,7 @@ void draw_game(f32 delta) {
 void process_game(void) {
     static f32 accumulator = 0;
 
-    if (IsKeyPressed(KEY_ESCAPE)) {
+    if (is_input_just_pressed(INPUT_PAUSE)) {
         paused = !paused;
     }
 

@@ -3,7 +3,7 @@
 
 #include "entity.h"
 
-void spawn_enemy(EnemyType type, Vector2 at);
+Entity *spawn_enemy(EnemyType type, Vector2 at);
 void setup_emitter(EmitterLive *emitter, const EmitterConfig *config);
 void stop_emitter(EmitterLive *emitter);
 

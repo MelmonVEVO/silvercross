@@ -26,19 +26,40 @@ static const ParticleConfig CANCELLED_BULLET_PARTICLE = (ParticleConfig){
 
 void process_bullet(Entity *self, f32 delta) {
     move(&self->position, self->velocity, delta);
-    accelerate(&self->velocity, self->as.bullet.config.acceleration,
-               delta);
-    move(&self->velocity, self->as.bullet.config.gravity, delta);
-    if (self->as.bullet.config.min_speed != 0 &&
+    accelerate(&self->velocity, self->as.bullet.positive_direction,
+               self->as.bullet.config.acceleration, delta);
+
+    if (self->as.bullet.config.flags & BULLETFLAG_HAS_MIN_SPEED &&
         check_magnitudes_lower(self->velocity,
                                self->as.bullet.config.min_speed)) {
         self->velocity = Vector2Scale(Vector2Normalize(self->velocity),
                                       self->as.bullet.config.min_speed);
     }
+    if (self->as.bullet.config.flags & BULLETFLAG_HAS_MAX_SPEED &&
+        check_magnitudes_higher(self->velocity,
+                                self->as.bullet.config.max_speed)) {
+        self->velocity = Vector2Scale(Vector2Normalize(self->velocity),
+                                      self->as.bullet.config.max_speed);
+    }
 
     self->velocity = Vector2Rotate(
         self->velocity,
         self->as.bullet.config.angular_velocity * DEG2RAD * delta);
+    self->as.bullet.positive_direction = Vector2Rotate(
+        self->as.bullet.positive_direction,
+        self->as.bullet.config.angular_velocity * DEG2RAD * delta);
+
+    if (Vector2LengthSqr(self->as.bullet.config.gravity) > EPSILON) {
+        move(&self->velocity, self->as.bullet.config.gravity, delta);
+        /* move(&self->as.bullet.positive_direction,
+         * TODO: update positive direction with gravity. i only really need
+         * to do this if i decide to add gravity *and* negative
+         * acceleration. */
+        /*      self->as.bullet.config.gravity, delta); */
+        self->as.bullet.positive_direction =
+            Vector2Normalize(self->as.bullet.positive_direction);
+    }
+
     self->as.bullet.ttl -= delta;
     if ((self->as.bullet.ttl <= 0) ||
         (self->position.y < -10.0f &&
@@ -50,7 +71,7 @@ void process_bullet(Entity *self, f32 delta) {
 }
 
 void draw_bullet(Entity *self, f32 delta) {
-    float rotation =
+    f32 rotation =
         (self->as.bullet.config.flags & BULLETFLAG_ROTATE_TEXTURE)
             ? atan2f(self->velocity.y, self->velocity.x) * RAD2DEG
             : 0;
@@ -62,10 +83,7 @@ void draw_bullet(Entity *self, f32 delta) {
 }
 
 static void fire(Vector2 initial_position, f32 direction,
-                 const BulletConfig *config) {
-    assert(config);
-    if (!config)
-        log_error("Config not passed in to spawn a bullet!");
+                 const BulletConfig config) {
     Entity *bullet = spawn_entity(ENTITY_BULLET);
     assert(bullet);
     if (!bullet) {
@@ -74,7 +92,7 @@ static void fire(Vector2 initial_position, f32 direction,
     }
     bullet->as.bullet = (BulletData){};
     BulletData *data = &bullet->as.bullet;
-    data->config = *config;
+    data->config = config;
     bullet->position = initial_position;
     bullet->velocity =
         VEC2FROMANGLE(direction, bullet->as.bullet.config.initial_speed);
@@ -87,6 +105,7 @@ static void fire(Vector2 initial_position, f32 direction,
         random_float() * total_animation_time(data->config.bullet_texture);
     data->texture_instance.row = data->config.texture_row;
     data->ttl = data->config.initial_ttl;
+    data->positive_direction = Vector2Normalize(bullet->velocity);
 }
 
 static const ParticleConfig player_bullet_impact_particle =
@@ -131,33 +150,45 @@ void hit_bullet(Entity *self, Entity *other) {
     self->queue_destroy = true;
 }
 
-static Vector2 get_bullet_start_position(Vector2 origin, float offset,
-                                         float rotation) {
+static Vector2 get_bullet_start_position(Vector2 origin, f32 offset,
+                                         f32 rotation) {
     Vector2 additional_vector = VEC2FROMANGLE(rotation, offset);
     return Vector2Add(origin, additional_vector);
 }
 
-void bullet_fire_one(Vector2 initial_position, float initial_angle,
-                     const BulletConfig *config, float offset) {
+void bullet_fire_one(Vector2 initial_position, f32 initial_angle,
+                     const BulletConfig *config, f32 offset,
+                     f32 angle_randomisation) {
     Vector2 start_position = get_bullet_start_position(
         initial_position, offset, DEG2RAD * initial_angle);
-    fire(start_position, DEG2RAD * initial_angle, config);
+    f32 angle = initial_angle + ((angle_randomisation * random_float()) -
+                                 (angle_randomisation * 0.5f));
+    fire(start_position, DEG2RAD * angle, *config);
 }
 
-void bullet_fire_arc(Vector2 initial_position, float direction,
+void bullet_fire_arc(Vector2 initial_position, f32 direction,
                      const BulletConfig *config, int bullets_in_arc,
-                     float arc_offset, float arc_angle,
-                     Trajectory trajectory) {
+                     f32 arc_offset, f32 arc_angle, Trajectory trajectory,
+                     f32 speed_randomisation, f32 angle_randomisation,
+                     bool constrain_randomisation) {
     if (bullets_in_arc < 2) {
         log_warning(
             "Tried to fire an arc with less than 2 bullets. Please check "
             "the firing configurations!");
         return;
     }
-    float angle_per_bullet =
+    const f32 angle_per_bullet =
         arc_get_angle_per_thing(bullets_in_arc, DEG2RAD * arc_angle);
     for (int i = 0; i < bullets_in_arc; i++) {
-        float bullet_angle = 0;
+        f32 random_angle =
+            DEG2RAD * ((angle_randomisation * random_float()) -
+                       (angle_randomisation * 0.5f));
+        if (constrain_randomisation) {
+            random_angle = Clamp(random_angle, DEG2RAD * direction,
+                                 DEG2RAD * (direction + arc_angle));
+        }
+        const f32 random_speed = speed_randomisation * random_float();
+        f32 bullet_angle = 0;
         Vector2 start_position = get_bullet_start_position(
             initial_position, arc_offset,
             arc_get_thing_angle_for_i(angle_per_bullet, i,
@@ -180,20 +211,25 @@ void bullet_fire_arc(Vector2 initial_position, float direction,
             break;
         default:
         }
-        fire(start_position, bullet_angle, config);
+        bullet_angle += random_angle;
+        BulletConfig new_config = *config;
+        new_config.initial_speed += random_speed;
+        fire(start_position, bullet_angle, new_config);
     }
 }
 
-void bullet_fire_ring(Vector2 initial_position, float direction,
+void bullet_fire_ring(Vector2 initial_position, f32 direction,
                       const BulletConfig *config, int bullets_in_ring,
-                      float ring_offset, Trajectory trajectory) {
+                      f32 ring_offset, Trajectory trajectory,
+                      f32 speed_randomisation, f32 angle_randomisation) {
     f32 angle_per_bullet =
         RAD2DEG * ring_get_angle_per_thing(bullets_in_ring);
     bullet_fire_arc(initial_position, direction, config, bullets_in_ring,
-                    ring_offset, 360.0f - angle_per_bullet, trajectory);
+                    ring_offset, 360.0f - angle_per_bullet, trajectory,
+                    speed_randomisation, angle_randomisation, false);
 }
 
-void fire_pattern(Vector2 position, float angle,
+void fire_pattern(Vector2 position, f32 angle,
                   const PatternConfig *pattern) {
     assert(pattern);
     if (!pattern) {
@@ -203,17 +239,23 @@ void fire_pattern(Vector2 position, float angle,
     switch (pattern->pattern_type) {
     case (BP_ONE):
         bullet_fire_one(position, angle, pattern->bullet_config,
-                        pattern->spawn_offset);
+                        pattern->spawn_offset,
+                        pattern->angle_randomisation);
         break;
     case (BP_RING):
         bullet_fire_ring(position, angle, pattern->bullet_config,
                          pattern->bullets_in_pattern,
-                         pattern->spawn_offset, pattern->trajectory);
+                         pattern->spawn_offset, pattern->trajectory,
+                         pattern->speed_randomisation,
+                         pattern->angle_randomisation);
         break;
     case (BP_ARC):
-        bullet_fire_arc(position, angle, pattern->bullet_config,
-                        pattern->bullets_in_pattern, pattern->spawn_offset,
-                        pattern->pattern_length, pattern->trajectory);
+        bullet_fire_arc(
+            position, angle, pattern->bullet_config,
+            pattern->bullets_in_pattern, pattern->spawn_offset,
+            pattern->pattern_length, pattern->trajectory,
+            pattern->speed_randomisation, pattern->angle_randomisation,
+            pattern->flags & PATTERNFLAG_CONSTRAIN_RANDOMISATION);
         break;
     case (BP_CUSTOM):
         assert(pattern->custom_fire);
@@ -226,9 +268,9 @@ void fire_pattern(Vector2 position, float angle,
     }
 }
 
-void fire_pattern_burst_shot(Vector2 position, float angle,
+void fire_pattern_burst_shot(Vector2 position, f32 angle,
                              const PatternConfig *pattern,
-                             float burst_progress) {
+                             f32 burst_progress) {
     assert(pattern);
     assert(pattern->bullet_config);
     if (!pattern) {
@@ -241,8 +283,8 @@ void fire_pattern_burst_shot(Vector2 position, float angle,
 
     if (pattern->burst_data.end_bullets_in_pattern > 0) {
         modified_pattern.bullets_in_pattern = (unsigned int)roundf(
-            Lerp((float)pattern->bullets_in_pattern,
-                 (float)pattern->burst_data.end_bullets_in_pattern,
+            Lerp((f32)pattern->bullets_in_pattern,
+                 (f32)pattern->burst_data.end_bullets_in_pattern,
                  burst_progress));
     }
 

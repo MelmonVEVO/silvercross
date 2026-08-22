@@ -29,6 +29,7 @@ typedef struct {
     f32 hyper_gauge;
     f32 collision_recovery_time;
     f32 bomber_charge_time;
+    f32 fire_time;
     EntityHandle bomber_entity;
     u8 life;
     u8 bomber_stock;
@@ -42,6 +43,7 @@ typedef struct {
 typedef struct BulletConfig {
     f32 initial_speed;
     f32 min_speed;
+    f32 max_speed;
     f32 acceleration;
     f32 angular_velocity;
     Vector2 gravity;
@@ -66,6 +68,7 @@ typedef struct {
     BulletConfig config;
     f32 ttl;
     AnimatedTexture2DInstance texture_instance;
+    Vector2 positive_direction;
 } BulletData;
 
 // Trajectory controls the initial angle of bullets fired.
@@ -117,8 +120,9 @@ typedef struct PatternConfig {
 } PatternConfig;
 
 typedef enum {
-    ENEMY_TEST_ENEMY,
     ENEMY_LUCIKO,
+    ENEMY_CANISTER,
+    ENEMY_LUCIKO_OPTION,
     ENEMY_TYPE_COUNT
 } EnemyType;
 
@@ -135,22 +139,22 @@ typedef struct {
     const PatternConfig *pattern;
     Vector2 local_position;
     int number_of_volleys;
-    float time_until_start;
-    float volley_rate;
-    float start_rotation;
-    float rotation_range;
-    float rotation_speed;
+    f32 time_until_start;
+    f32 volley_rate;
+    // When using the AIMED rotation type, this is used as an offset
+    f32 start_rotation;
+    f32 rotation_range;
+    f32 rotation_speed;
     RotationType rotation_type;
-    bool enabled_by_default;
 } EmitterConfig;
 
 typedef struct {
     const EmitterConfig *config;
     bool enabled;
-    float cooldown_between_volleys;
-    float current_rotation;
-    int volleys_left;
-    float inverse_rotate;
+    f32 cooldown_between_volleys;
+    f32 current_rotation;
+    i32 volleys_left;
+    f32 bounce_rotation_direction;
     struct {
         bool active;
         float shot_cooldown;
@@ -175,6 +179,13 @@ typedef enum {
     ENEMY_DEATH_BOSS,
 } EnemyDeathType;
 
+typedef enum {
+    LKO_LEFT_FIELD,
+    LKO_RIGHT_FIELD,
+    LKO_AIMED_LEFT,
+    LKO_AIMED_RIGHT,
+} LucikoOptionType;
+
 typedef struct {
     EnemyType enemy_type;
     EmitterLive current_emitters[MAX_EMITTERS];
@@ -186,9 +197,19 @@ typedef struct {
         struct {
             LucikoPhase phase;
             LucikoPhase switch_to;
+            u8 canisters_to_spawn;
+            bool has_spawned_options;
             Vector2 move_location;
             f32 linger_time;
+            f32 canister_spawn_delay;
         } luciko_data;
+        struct {
+            LucikoOptionType type;
+        } luciko_option_data;
+        struct {
+            bool luciko_canister;
+            bool died_from_timeout;
+        } canister_data;
     };
 } EnemyData;
 
@@ -288,6 +309,8 @@ void process_entities(f32 delta);
 void draw_entities(f32 delta);
 u32 entity_count(void);
 u32 cancel_bullets(bool spawn_crystals, bool spawn_the_particle);
+// Use this when you start to get into shenanigans with entities that are
+// children of other entities
 Vector2 get_entity_world_position(Entity *entity);
 void add_child(Entity *parent_entity, Entity *child_entity);
 
